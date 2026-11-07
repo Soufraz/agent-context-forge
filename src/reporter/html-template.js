@@ -207,6 +207,33 @@ export function generateHtmlReport(report) {
       margin-top: 4px;
     }
 
+    /* Mental Model & 2-Layer Architecture */
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .concept-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .concept-card h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .concept-card p {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
     /* Pillars */
     .pillar-section {
       background: var(--card-bg);
@@ -411,6 +438,23 @@ export function generateHtmlReport(report) {
           ${escapeHtml(tokenWasteRisk)}
         </div>
         <span class="stat-sub">Lockfile & test stdout exposure</span>
+      </div>
+    </div>
+
+    <div class="concepts-grid">
+      <div class="concept-card">
+        <h3>🧠 The Mental Model: RAM vs. Disk</h3>
+        <p>
+          Treat the active LLM context window like <strong>fast, high-signal RAM</strong> (kept lean, static, and frozen).
+          Use repository files, LSP compiler tools, and persistent Auto-Memory as <strong>deep Disk storage</strong> queried progressively on demand.
+        </p>
+      </div>
+      <div class="concept-card">
+        <h3>🧩 Layer 1 (Harness) vs. Layer 2 (Methodology)</h3>
+        <p>
+          <strong>Layer 1 (This Harness):</strong> Provides the rails, token filters, LSP bridges, and pre-commit cache gates.<br>
+          <strong>Layer 2 (Your Methodology):</strong> Choose how you plan and decompose tasks (Superpowers SDD, GetShitDone, ECC, Elephant-Goldfish, or TDD).
+        </p>
       </div>
     </div>
 

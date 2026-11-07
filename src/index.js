@@ -18,6 +18,27 @@ export async function runCli() {
     )}`
   );
 
+  p.note(
+    `${pc.bold('💡 The Mental Model:')} ${pc.italic('Active Context Window = RAM')} ${pc.dim(
+      '(fast & lean)'
+    )} | ${pc.italic('Repository & Memory = Disk')} ${pc.dim('(queried on demand)')}\n\n` +
+      `${pc.bold(pc.cyan('LAYER 2: Workflow & Planning Methodology'))} ${pc.dim(
+        '(Superpowers, GSD, ECC, EGM, TDD)'
+      )}\n` +
+      `  ${pc.dim('→ How you brainstorm, break down tasks, and write code.')}\n\n` +
+      `${pc.bold(pc.magenta('LAYER 1: The Context Engineering Harness'))} ${pc.dim(
+        '(agent-context-forge)'
+      )}\n` +
+      `  ${pc.dim('→ The invisible rails, token filters, LSP bridges, and prompt cache gates.')}\n\n` +
+      `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
+      `  ${pc.yellow('1. Prefix Stability')}       ${pc.dim('—')} Freeze Tier-1 root rules (<150 lines) for >80% cache hits.\n` +
+      `  ${pc.yellow('2. Progressive Disclosure')} ${pc.dim('—')} Query compiler symbols (LSP) instead of reading 400-line files.\n` +
+      `  ${pc.yellow('3. Observation Masking')}    ${pc.dim('—')} Compress test/build noise with RTK (~60–90% token savings).\n` +
+      `  ${pc.yellow('4. Context Isolation')}      ${pc.dim('—')} Delegate sprawling searches to subagents; keep chat flat.\n` +
+      `  ${pc.yellow('5. Episodic Memory')}        ${pc.dim('—')} Retain cross-session lessons without dirtying repo prefix.`,
+    '📖 Welcome & Core Concepts'
+  );
+
   // 1. Provider / Engine Selection
   const engine = await p.select({
     message: 'Select your target Agent / LLM Engine:',

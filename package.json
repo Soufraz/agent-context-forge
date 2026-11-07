@@ -36,6 +36,17 @@
   ],
   "author": "Soufraz",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Soufraz/agent-context-forge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Soufraz/agent-context-forge/issues"
+  },
+  "homepage": "https://github.com/Soufraz/agent-context-forge#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
     "picocolors": "^1.1.1"

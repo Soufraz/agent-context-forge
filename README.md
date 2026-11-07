@@ -8,6 +8,7 @@
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
 [![Zero Telemetry](https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20Zero%20Telemetry-brightgreen)](#license)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 </div>
 
@@ -20,6 +21,10 @@ Run directly inside **any existing repository** (to audit context health) or an 
 ```bash
 npx agent-context-forge
 ```
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Agent Context Forge Interactive CLI Scaffolding Demo" width="900">
+</p>
 
 * **In an existing codebase:** Audits your repository across the 5 Pillars of Context Engineering in `< 2 seconds` and opens a self-contained, dark-mode **HTML Context Health Dashboard** in your browser.
 * **In an empty folder (or when installing):** Launches an interactive stack wizard to configure native LSP symbol navigation, [`rtk`](https://github.com/rtk-ai/rtk) test output compression, runaway exploration guardrails, episodic memory, and optional SDD rules.
@@ -170,6 +175,52 @@ npm test
 
 ---
 
-## 📄 License
+## 💖 Standing on the Shoulders of Giants & Fair-Use Attribution
 
-[MIT](LICENSE) — Free to use, fork, and adapt across personal and commercial projects. Contributions and PRs for additional agent adapters are welcome!
+### The Philosophy: Proven Solutions, One Cohesive Foundation
+We did not reinvent the wheel, nor do we claim to have discovered revolutionary new neural algorithms. The pain points of unmanaged context—prompt cache thrashing, token bloat from lockfiles, test output pollution, and runaway inline exploration—are felt by engineers and AI researchers every day.
+
+Brilliant creators across the open-source community have built focused, high-impact utilities and methodologies to address individual facets of this challenge.
+
+**Agent Context Forge** exists to synthesize these proven open-source solutions into a clean, reproducible, and standardized **Layer-1 boilerplate generator and health auditor**. It gives developers a solid context-engineering foundation in under 10 seconds, eliminating hours of manual configuration, trial-and-error, and expensive token burn.
+
+### Deep Gratitude to the Open-Source Ecosystem
+We extend our deepest respect and fair-use attribution to the creators whose tools, research, and ideas made this project possible:
+
+* **[`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) by [@rtk-ai](https://github.com/rtk-ai):** An outstanding, blisteringly fast Rust tool that revolutionizes tool-call observation masking by collapsing passing test suites while retaining 100% of failure diffs.
+* **Anthropic & Claude Code:** For pioneering native compiler-backed LSP tool discovery (`LSPGoToDefinition`, `LSPFindReferences`), deterministic shell lifecycle hooks (`SessionStart`, `PreToolUse`, `PreCompact`), and machine-local two-tier Auto-Memory.
+* **[`@clack/prompts`](https://github.com/natemoo-re/clack) & [`picocolors`](https://github.com/alexeyraspopov/picocolors) by Nate Moore & Alexey Raspopov:** For crafting the clean, accessible, terminal UI and formatting primitives that power the interactive CLI wizard.
+* **Layer-2 Methodology Creators & Communities:**
+  * **[Superpowers SDD](https://github.com/obra/superpowers) by Jesse Vincent (`obra/superpowers`):** For pioneering systematic subagent dispatching, strict TDD red-green-refactor loops, and structured planning.
+  * **[GetShitDone — GSD](https://github.com/open-gsd/gsd-core) (`open-gsd/gsd-core`):** For proving the effectiveness of contract-first, phase-isolated spec workflows.
+  * **[Everything Claude Code — ECC](https://github.com/affaan-m/everything-claude-code) by Affaan M (`affaan-m/everything-claude-code`):** For insightful prompt-caching research, subagent patterns, and engineering skills.
+  * **[The Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model) (`google/elephant-goldfish-model`):** For the conceptual distinction between long-term disk memory (Elephant) and stateless, bias-free execution (Goldfish).
+  * **[`context-mode`](https://github.com/mksglu/context-mode) by mksglu:** For pioneering SQLite FTS5/BM25 MCP sandboxing for context virtualization.
+
+---
+
+## 🤝 Contributing
+
+We warmly welcome contributions, issue reports, and pull requests! 
+
+Whether you want to:
+* Build runtime adapters for **Gemini CLI / Google Antigravity**, **OpenCode / Aider**, **Cursor**, or **Codex** ([Issue #1](https://github.com/Soufraz/agent-context-forge/issues/1))
+* Add new scanner checks to detect context leaks or token-bomb formats
+* Implement alternative language server or output compressor integrations
+* Improve hook execution performance and edge cases
+
+Please read our **[Contributing Guide](CONTRIBUTING.md)** for local development setup, test instructions, and PR guidelines.
+
+---
+
+## 📄 License & Why MIT
+
+This project is licensed under the **[MIT License](LICENSE)**.
+
+### Why MIT?
+`agent-context-forge` is designed as a foundational scaffolding tool. When you run `npx agent-context-forge`, it injects hooks, scripts, and rule templates directly into your codebase.
+
+The **MIT License** was deliberately chosen because:
+1. **Unrestricted Adoption:** You can freely scaffold, adapt, and run these hooks across any project—including closed-source, personal, academic, and proprietary enterprise software—without licensing friction or legal ambiguity.
+2. **Zero Contagion:** Unlike copyleft licenses (such as GPL), MIT never requires you to open-source your own project simply because you used `agent-context-forge` to scaffold your agent rules.
+3. **Open Collaboration:** Anyone can freely audit, fork, benchmark, and contribute enhancements back to the community.

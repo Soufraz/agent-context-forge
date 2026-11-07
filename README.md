@@ -52,17 +52,9 @@ Our guiding systems principle is simple:
 
 `agent-context-forge` does **not** dictate how you brainstorm or plan features. It is the **Layer 1 infrastructure harness** that sits underneath your preferred **Layer 2 workflow**:
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│  LAYER 2: Workflow & Planning Methodology                              │
-│  Superpowers SDD • GetShitDone (GSD) • ECC • Elephant-Goldfish • TDD   │
-│  ↳ "How you brainstorm, decompose specs, and coordinate tasks."        │
-├────────────────────────────────────────────────────────────────────────┤
-│  ▲ ▲ ▲ ▲ ▲  LAYER 1: The Foundation Harness (agent-context-forge)      │
-│  Prefix Cache Gate • Native LSP • RTK Compression • Isolation Hooks    │
-│  ↳ "The rails that keep context lean, cached, and noise-free."         │
-└────────────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="assets/diagrams/two-layer-architecture.svg" alt="The 2-Layer Stack: Harness vs. Methodology" width="880">
+</p>
 
 ---
 
@@ -83,6 +75,11 @@ When you run `npx agent-context-forge`, it adapts to your directory:
 
 ### 1. The 5-Pillar Context Audit & HTML Dashboard (`Scan` Mode)
 Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-report.html` in your default browser:
+
+<p align="center">
+  <img src="assets/report-mocks/suggestion1-executive-dashboard.svg" alt="Context Health Audit Dashboard Simulation" width="880">
+</p>
+
 * **Context Health Score (0–100 / Grade A–F)** + estimated **Prompt Cache Hit Rate** and **Token Waste Risk**.
 * **Exact `File:Line` Violations:** Pinpoints volatile markers (`TODO`, checkboxes, dates) and dead file paths inside `CLAUDE.md` / `AGENTS.md`.
 * **Live Token-Bomb Exposure:** Scans the repo for unprotected lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`) and calculates how many thousands of tokens an accidental `Read` will cost.

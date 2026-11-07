@@ -2,7 +2,13 @@ import { execSync } from 'node:child_process';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { inspectDirectory } from './detector.js';
-import { isPluginEnabled, lspPluginsFor, pluginInstallCommand } from './lsp-plugins.js';
+import {
+  installedPluginsFor,
+  isPluginEnabled,
+  lspPluginsFor,
+  pluginInstallCommand,
+  tsserverAvailable
+} from './lsp-plugins.js';
 import { loadSettingsLayers } from './scanner/settings.js';
 
 export function isCommandAvailable(cmd) {
@@ -59,8 +65,9 @@ export async function offerToolInstallations(targetDir) {
   // 2. Offer to install each language server, then point to its code intelligence plugin:
   //    Claude Code keeps its LSP tool off until the plugin is installed.
   const layers = loadSettingsLayers(targetDir);
+  const installed = installedPluginsFor(targetDir);
   for (const server of lspPluginsFor(dirInfo.projectTypes)) {
-    if (!isCommandAvailable(server.binary)) {
+    if (!isCommandAvailable(server.binary) || (server.needsTsserver && !tsserverAvailable(targetDir))) {
       if (server.install.startsWith('npm ') && hasNpm) {
         const installLsp = await p.confirm({
           message: `${server.language} language server (${server.binary}) is not installed. Install it globally? (Runs: ${server.install})`,
@@ -85,7 +92,10 @@ export async function offerToolInstallations(targetDir) {
       }
     }
 
-    if (!isPluginEnabled(layers, server.plugin)) {
+    const pluginActive = installed
+      ? installed.some((id) => id.startsWith(`${server.plugin}@`))
+      : isPluginEnabled(layers, server.plugin);
+    if (!pluginActive) {
       p.log.info(
         `${pc.yellow('Notice:')} Claude Code's LSP tool stays off until the ${server.plugin} code intelligence plugin is installed.\n` +
           `Install it with: ${pc.cyan(pluginInstallCommand(server))}`

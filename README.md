@@ -120,7 +120,7 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 
 ### Pillar 2: Progressive Disclosure via LSP & Token-Bomb Denials
 * **Files:** [`.claude/settings.json`](.claude/settings.json) + [`scripts/agent-gates/check-lsp.sh`](scripts/agent-gates/check-lsp.sh)
-* **Mechanism:** Claude Code's `LSP` tool (go to definition, find references, diagnostics after edits) stays off until you install a [code intelligence plugin](https://code.claude.com/docs/en/plugins/code-intelligence) for your language, and a language server on `PATH` is not enough on its own. The doctor and scanner check for both the plugin (e.g. `claude plugin install typescript-lsp@claude-plugins-official`) and the binary it starts (e.g. `typescript-language-server`).
+* **Mechanism:** Claude Code's `LSP` tool (go to definition, find references, diagnostics after edits) stays off until you install a [code intelligence plugin](https://code.claude.com/docs/en/plugins/code-intelligence) for your language, and a language server on `PATH` is not enough on its own. The doctor and scanner check that the plugin is installed for the project folder (e.g. `claude plugin install typescript-lsp@claude-plugins-official`), not just enabled in settings, and that the binary it starts can run. For TypeScript that means `npm install -g typescript-language-server typescript@6`: TypeScript 7 no longer ships the `tsserver.js` the server needs.
 * **Hard Denials:** Pre-populates `permissions.deny` for `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `node_modules/**`, `dist/**`, `.next/**`, and `*.min.js`.
 
 ### Pillar 3: Transparent Observation Masking (`rtk`)

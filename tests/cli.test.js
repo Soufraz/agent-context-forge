@@ -304,7 +304,11 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
       fakeBinary('pyright-langserver');
       assert.equal(lspScore(), 0);
 
+      // The server binary alone can't start without a tsserver.js (TypeScript 7 ships none)
       fakeBinary('typescript-language-server');
+      assert.equal(lspScore(), 0);
+      fs.mkdirSync(path.join(tmpProject, 'node_modules', 'typescript', 'lib'), { recursive: true });
+      fs.writeFileSync(path.join(tmpProject, 'node_modules', 'typescript', 'lib', 'tsserver.js'), '');
       assert.equal(lspScore(), 8);
 
       fs.mkdirSync(path.join(tmpProject, '.claude'));

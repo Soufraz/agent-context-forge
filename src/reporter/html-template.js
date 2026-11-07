@@ -475,7 +475,7 @@ export function generateHtmlReport(report) {
         # Inject or upgrade the full Agent Context Forge harness into this repository:<br>
         <strong>npx agent-context-forge</strong><br><br>
         # Install recommended developer environment tools (TypeScript shown; see the Pillar 2 findings for your language):<br>
-        npm install -g typescript-language-server typescript<br>
+        npm install -g typescript-language-server typescript@6<br>
         claude plugin install typescript-lsp@claude-plugins-official<br>
         brew install rtk
       </div>

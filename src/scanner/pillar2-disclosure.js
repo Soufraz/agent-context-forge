@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { inspectDirectory } from '../detector.js';
-import { isPluginEnabled, lspPluginsFor, pluginInstallCommand } from '../lsp-plugins.js';
+import {
+  installedPluginsFor,
+  isPluginEnabled,
+  lspPluginsFor,
+  pluginInstallCommand,
+  tsserverAvailable
+} from '../lsp-plugins.js';
 import { loadSettingsLayers } from './settings.js';
 
 /**
@@ -43,9 +49,13 @@ export function auditPillar2(projectDir) {
         'LSP navigation needs a code intelligence plugin for the repo language (see https://code.claude.com/docs/en/plugins/code-intelligence).'
     });
   } else {
-    // 1. Code intelligence plugin enabled for each language (4 pts). This, not a settings
-    //    flag, is what turns on Claude Code's LSP tool.
-    const missingPlugins = servers.filter((server) => !isPluginEnabled(layers, server.plugin));
+    // 1. Code intelligence plugin installed for this folder, per language (4 pts). This, not a
+    //    settings flag, is what turns on Claude Code's LSP tool. Without the claude CLI, fall
+    //    back to what settings enable.
+    const installed = installedPluginsFor(projectDir);
+    const isActive = (plugin) =>
+      installed ? installed.some((id) => id.startsWith(`${plugin}@`)) : isPluginEnabled(layers, plugin);
+    const missingPlugins = servers.filter((server) => !isActive(server.plugin));
     score += Math.round((4 * (servers.length - missingPlugins.length)) / servers.length);
     if (missingPlugins.length === 0) {
       findings.push({
@@ -56,15 +66,17 @@ export function auditPillar2(projectDir) {
     } else {
       findings.push({
         status: 'warn',
-        title: `Code Intelligence Plugin Not Enabled: ${missingPlugins.map((s) => s.plugin).join(', ')}`,
+        title: `Code Intelligence Plugin Not Installed: ${missingPlugins.map((s) => s.plugin).join(', ')}`,
         description: `Claude Code keeps its LSP tool off until the plugin is installed. Run: ${missingPlugins
           .map(pluginInstallCommand)
           .join(' && ')}`
       });
     }
 
-    // 2. The binary each plugin starts is on PATH (8 pts)
-    const missingBinaries = servers.filter((server) => !isCommandAvailable(server.binary));
+    // 2. The binary each plugin starts is on PATH and can run (8 pts)
+    const missingBinaries = servers.filter(
+      (server) => !isCommandAvailable(server.binary) || (server.needsTsserver && !tsserverAvailable(projectDir))
+    );
     score += Math.round((8 * (servers.length - missingBinaries.length)) / servers.length);
     if (missingBinaries.length === 0) {
       findings.push({

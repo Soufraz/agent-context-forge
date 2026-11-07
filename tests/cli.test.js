@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { execSync } from 'node:child_process';
 
 import { inspectDirectory } from '../src/detector.js';
 import { generateProjectContext } from '../src/context-generator.js';
@@ -211,6 +212,30 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     // Without the import, AGENTS.md is ignored by Claude Code and the scanner says so
     fs.writeFileSync(path.join(tmpProject, 'CLAUDE.md'), '# Rules\n');
     assert.ok(auditProject(tmpProject).pillars.pillar1.findings.some((f) => f.title === 'AGENTS.md Is Not Loaded by Claude Code'));
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('auditPillar1: dead path check flags missing files, not expressions or generated output', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_deadpaths_'));
+    execSync('git init -q', { cwd: tmpProject });
+    fs.mkdirSync(path.join(tmpProject, 'packages', 'app', 'src', 'cli'), { recursive: true });
+    fs.writeFileSync(path.join(tmpProject, 'packages', 'app', 'src', 'cli', 'dev.ts'), '');
+    fs.writeFileSync(path.join(tmpProject, '.gitignore'), '.next/\n');
+    execSync('git add -A', { cwd: tmpProject });
+    fs.writeFileSync(
+      path.join(tmpProject, 'CLAUDE.md'),
+      [
+        '- Run `scripts/missing.sh` before committing.', // really missing
+        '- Dev server: `src/cli/dev.ts`.', // package-relative, exists under packages/app
+        '- Never read `.next/` output.', // git-ignored build output
+        '- Native addons end in `.node`; query with `.items.name`.', // not paths
+        '- Branches look like `.../ABC-1/fix-thing`.' // placeholder
+      ].join('\n')
+    );
+
+    const finding = auditProject(tmpProject).pillars.pillar1.findings.find((f) => /Dead Path/.test(f.title));
+    assert.deepEqual(finding?.details, ['scripts/missing.sh']);
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });

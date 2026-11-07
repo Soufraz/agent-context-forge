@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { findHook, hookCommands, loadSettingsLayers, projectScriptStatus } from './settings.js';
@@ -28,6 +29,47 @@ export function loadWithImports(file, depth = 0, seen = new Set()) {
     }
   }
   return parts;
+}
+
+/**
+ * Tracked files and an ignore check for the repo, or null outside git. Tracked paths cover
+ * sparse checkouts, and package-relative mentions in monorepos.
+ */
+function gitPaths(projectDir) {
+  try {
+    const tracked = execSync('git ls-files', { cwd: projectDir, encoding: 'utf-8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n')
+      .filter(Boolean);
+    const isIgnored = (rel) => {
+      try {
+        execSync(`git check-ignore -q -- ${JSON.stringify(rel)}`, { cwd: projectDir, stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    return { tracked, isIgnored };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a path mentioned in Tier-1 context exists: on disk, as a tracked file or directory,
+ * as a package-relative path in a monorepo (`src/cli/x.ts` for `packages/a/src/cli/x.ts`), or as
+ * git-ignored generated output (`.next/`).
+ */
+function pathExists(projectDir, rawPath, repo) {
+  if (fs.existsSync(path.resolve(projectDir, rawPath))) return true;
+  if (!repo) return false;
+  const token = rawPath.replace(/^\.\//, '');
+  const rel = token.replace(/\/$/, '');
+  return (
+    repo.tracked.some((f) => f === rel || f.startsWith(`${rel}/`) || f.endsWith(`/${rel}`) || f.includes(`/${rel}/`)) ||
+    // Keep a trailing slash: a directory-only pattern like `.next/` can't match a path that
+    // doesn't exist unless git is told it names a directory
+    repo.isIgnored(token)
+  );
 }
 
 /**
@@ -148,20 +190,26 @@ export function auditPillar1(projectDir) {
 
   // 4. Dead reference path check (4 pts)
   const deadPaths = [];
+  const repo = gitPaths(projectDir);
   const pathRegex = /(?:`|\()([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+|\.[a-zA-Z0-9_\-./]+)(?:`|\))/g;
   let match;
   while ((match = pathRegex.exec(content)) !== null) {
     const rawPath = match[1];
-    // Filter out URLs, scheme links, licenses
-    if (rawPath.startsWith('http') || rawPath.startsWith('file:') || rawPath.startsWith('//') || rawPath.includes('*')) {
+    // Filter out URLs, scheme links, licenses, globs, and placeholders such as `.../x`
+    if (
+      rawPath.startsWith('http') ||
+      rawPath.startsWith('file:') ||
+      rawPath.startsWith('//') ||
+      rawPath.includes('*') ||
+      rawPath.includes('...')
+    ) {
       continue;
     }
-    // Only check relative repo paths (e.g. scripts/..., .claude/..., src/...)
-    if (rawPath.startsWith('.') || rawPath.startsWith('scripts/') || rawPath.startsWith('src/')) {
-      const resolved = path.resolve(projectDir, rawPath);
-      if (!fs.existsSync(resolved)) {
-        deadPaths.push(rawPath);
-      }
+    // Only check relative repo paths (e.g. scripts/..., .claude/..., src/...). A token without
+    // a slash is more often an extension, a jq filter or a property (`.node`, `.manager`).
+    const isRepoPath = rawPath.startsWith('.') || rawPath.startsWith('scripts/') || rawPath.startsWith('src/');
+    if (isRepoPath && rawPath.includes('/') && !pathExists(projectDir, rawPath, repo)) {
+      deadPaths.push(rawPath);
     }
   }
 

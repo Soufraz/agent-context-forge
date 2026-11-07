@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,12 +7,74 @@ import { generateProjectContext } from './context-generator.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
+// Suffix for our version of a user-owned file we refused to overwrite. It must not end in
+// `.md`, or Claude Code would load a proposed `.claude/agents/*.md` as a duplicate agent.
+export const PROPOSAL_SUFFIX = '.context-forge-new';
+
+// Hook scripts this harness wires into settings.json. On re-install, hook entries running
+// these scripts are replaced with the current definitions; every other hook is left alone.
+const HARNESS_HOOK_SCRIPTS = [
+  'scripts/agent-gates/doctor.sh',
+  '.claude/hooks/rewrite-rtk.sh',
+  '.claude/hooks/pre-commit-prefix-stability.sh',
+  '.claude/hooks/guard-subagent-isolation.py',
+  '.claude/hooks/pre-compact-handover.sh'
+];
+
+const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
+
+const isHarnessHook = (hook) =>
+  typeof hook?.command === 'string' &&
+  HARNESS_HOOK_SCRIPTS.some((script) => hook.command.includes(script));
+
+/**
+ * Merges the harness settings into an existing settings object without dropping anything
+ * the user configured: deny rules are unioned, and only hook entries that run this
+ * harness's own scripts are replaced.
+ */
+export function mergeSettings(existing, ours) {
+  const merged = { ...existing };
+  if (!merged.$schema) merged.$schema = ours.$schema;
+
+  const existingDeny = Array.isArray(existing.permissions?.deny) ? existing.permissions.deny : [];
+  merged.permissions = {
+    ...(existing.permissions || {}),
+    deny: [...new Set([...existingDeny, ...ours.permissions.deny])]
+  };
+
+  merged.hooks = { ...(existing.hooks || {}) };
+  for (const event of new Set([...Object.keys(merged.hooks), ...Object.keys(ours.hooks)])) {
+    const userGroups = (Array.isArray(merged.hooks[event]) ? merged.hooks[event] : [])
+      .map((group) => ({
+        ...group,
+        hooks: Array.isArray(group.hooks) ? group.hooks.filter((hook) => !isHarnessHook(hook)) : group.hooks
+      }))
+      .filter((group) => !Array.isArray(group.hooks) || group.hooks.length > 0);
+    const groups = [...userGroups, ...(ours.hooks[event] || [])];
+    if (groups.length > 0) {
+      merged.hooks[event] = groups;
+    } else {
+      delete merged.hooks[event];
+    }
+  }
+
+  return merged;
+}
+
 /**
  * Scaffolds the Agent Context Forge harness into a target directory.
  *
+ * Existing files are never silently destroyed:
+ * - `.claude/settings.json` is merged (see `mergeSettings`) and backed up before it changes.
+ * - Harness-owned scripts are replaced; local edits are kept in a `.bak` copy first.
+ * - User-owned files (CLAUDE.md, AGENTS.md, rules, agents, git hooks) are only replaced when
+ *   they are unchanged since the last install. Otherwise the user's file is kept and our
+ *   version is written next to it with the `PROPOSAL_SUFFIX` suffix.
+ *
  * @param {string} targetDir Destination folder
  * @param {object} options Selected configuration options
- * @returns {string[]} List of created or updated files relative to targetDir
+ * @returns {{files: string[], backups: string[], proposals: string[]}} Paths relative to
+ *   targetDir: files written, backups made, and proposals written beside user files
  */
 export function scaffoldProject(targetDir, options = {}) {
   const {
@@ -24,7 +87,14 @@ export function scaffoldProject(targetDir, options = {}) {
     projectContext = null
   } = options;
 
-  const createdFiles = [];
+  const result = { files: [], backups: [], proposals: [] };
+  const installedHashes = {};
+
+  const manifestPath = path.join(targetDir, '.claude', 'context-forge.json');
+  let previousHashes = {};
+  try {
+    previousHashes = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')).files || {};
+  } catch {}
 
   const ensureDir = (dirPath) => {
     if (!fs.existsSync(dirPath)) {
@@ -32,22 +102,82 @@ export function scaffoldProject(targetDir, options = {}) {
     }
   };
 
-  const copyFileWithPerms = (src, dest, isExecutable = false) => {
-    ensureDir(path.dirname(dest));
-    fs.copyFileSync(src, dest);
-    if (isExecutable) {
-      fs.chmodSync(dest, 0o755);
+  const backup = (dest) => {
+    let backupPath = `${dest}.bak`;
+    for (let i = 1; fs.existsSync(backupPath); i++) {
+      backupPath = `${dest}.bak.${i}`;
     }
-    createdFiles.push(path.relative(targetDir, dest));
+    fs.copyFileSync(dest, backupPath);
+    result.backups.push(path.relative(targetDir, backupPath));
   };
 
-  const writeFileWithPerms = (dest, content, isExecutable = false) => {
+  const write = (dest, content, isExecutable) => {
     ensureDir(path.dirname(dest));
-    fs.writeFileSync(dest, content, 'utf-8');
+    fs.writeFileSync(dest, content);
     if (isExecutable) {
       fs.chmodSync(dest, 0o755);
     }
-    createdFiles.push(path.relative(targetDir, dest));
+  };
+
+  /**
+   * @param {'harness' | 'user'} owner `harness` files are ours to upgrade (after a backup of
+   *   local edits); `user` files are never replaced once edited.
+   */
+  const install = (dest, content, { isExecutable = false, owner = 'harness' } = {}) => {
+    const rel = path.relative(targetDir, dest);
+    const hash = sha256(content);
+
+    if (fs.existsSync(dest)) {
+      const currentHash = sha256(fs.readFileSync(dest));
+      if (currentHash === hash) {
+        if (isExecutable) fs.chmodSync(dest, 0o755);
+        installedHashes[rel] = hash;
+        return;
+      }
+      const unchangedSinceLastInstall = previousHashes[rel] === currentHash;
+      if (!unchangedSinceLastInstall) {
+        if (owner === 'user') {
+          write(dest + PROPOSAL_SUFFIX, content, false);
+          result.proposals.push(rel + PROPOSAL_SUFFIX);
+          return;
+        }
+        backup(dest);
+      }
+    }
+
+    write(dest, content, isExecutable);
+    installedHashes[rel] = hash;
+    result.files.push(rel);
+  };
+
+  const copyFileWithPerms = (src, dest, isExecutable = false, owner = 'harness') =>
+    install(dest, fs.readFileSync(src), { isExecutable, owner });
+
+  const writeFileWithPerms = (dest, content, isExecutable = false, owner = 'harness') =>
+    install(dest, Buffer.from(content, 'utf-8'), { isExecutable, owner });
+
+  const installSettings = (dest, ours) => {
+    const rel = path.relative(targetDir, dest);
+    let merged = ours;
+    if (fs.existsSync(dest)) {
+      const raw = fs.readFileSync(dest, 'utf-8');
+      let existing;
+      try {
+        existing = JSON.parse(raw);
+      } catch {}
+      if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        // Unparseable settings: leave them for the user to fix, and propose ours alongside.
+        write(dest + PROPOSAL_SUFFIX, JSON.stringify(ours, null, 2) + '\n', false);
+        result.proposals.push(rel + PROPOSAL_SUFFIX);
+        return;
+      }
+      merged = mergeSettings(existing, ours);
+      const content = JSON.stringify(merged, null, 2) + '\n';
+      if (content === raw) return;
+      backup(dest);
+    }
+    write(dest, JSON.stringify(merged, null, 2) + '\n', false);
+    result.files.push(rel);
   };
 
   // 1. Build .claude/settings.json dynamically based on user choices
@@ -142,8 +272,7 @@ export function scaffoldProject(targetDir, options = {}) {
     ]
   };
 
-  const settingsPath = path.join(targetDir, '.claude', 'settings.json');
-  writeFileWithPerms(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  installSettings(path.join(targetDir, '.claude', 'settings.json'), settings);
 
   // 2. Copy Core Hooks
   const hooksDir = path.join(PACKAGE_ROOT, '.claude', 'hooks');
@@ -180,7 +309,9 @@ export function scaffoldProject(targetDir, options = {}) {
     if (fs.existsSync(orchestratorSrc)) {
       copyFileWithPerms(
         orchestratorSrc,
-        path.join(targetDir, '.claude', 'agents', 'orchestrator.md')
+        path.join(targetDir, '.claude', 'agents', 'orchestrator.md'),
+        false,
+        'user'
       );
     }
   }
@@ -211,7 +342,7 @@ export function scaffoldProject(targetDir, options = {}) {
   // 5. Universal Git Hook
   const gitHookSrc = path.join(PACKAGE_ROOT, '.githooks', 'pre-commit');
   if (fs.existsSync(gitHookSrc)) {
-    copyFileWithPerms(gitHookSrc, path.join(targetDir, '.githooks', 'pre-commit'), true);
+    copyFileWithPerms(gitHookSrc, path.join(targetDir, '.githooks', 'pre-commit'), true, 'user');
   }
 
   // 6. Context Documents (Custom or Starter)
@@ -223,15 +354,17 @@ export function scaffoldProject(targetDir, options = {}) {
       masking,
       episodicMemory
     });
-    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), generated.claudeMdContent);
-    writeFileWithPerms(path.join(targetDir, 'AGENTS.md'), generated.agentsMdContent);
+    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), generated.claudeMdContent, false, 'user');
+    writeFileWithPerms(path.join(targetDir, 'AGENTS.md'), generated.agentsMdContent, false, 'user');
     writeFileWithPerms(
       path.join(targetDir, '.agents', 'rules', 'project-architecture.md'),
-      generated.architectureRuleContent
+      generated.architectureRuleContent,
+      false,
+      'user'
     );
   } else {
-    copyFileWithPerms(path.join(PACKAGE_ROOT, 'CLAUDE.md'), path.join(targetDir, 'CLAUDE.md'));
-    copyFileWithPerms(path.join(PACKAGE_ROOT, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
+    copyFileWithPerms(path.join(PACKAGE_ROOT, 'CLAUDE.md'), path.join(targetDir, 'CLAUDE.md'), false, 'user');
+    copyFileWithPerms(path.join(PACKAGE_ROOT, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'), false, 'user');
     const rulesGitKeep = path.join(PACKAGE_ROOT, '.agents', 'rules', '.gitkeep');
     if (fs.existsSync(rulesGitKeep)) {
       copyFileWithPerms(rulesGitKeep, path.join(targetDir, '.agents', 'rules', '.gitkeep'));
@@ -271,12 +404,13 @@ You selected [context-mode](https://github.com/mksglu/context-mode) for advanced
     subagentIsolation,
     episodicMemory,
     sdd,
-    installedAt: new Date().toISOString()
+    installedAt: new Date().toISOString(),
+    // Hashes of the files as written, so a later upgrade can tell unedited files from edited ones
+    files: installedHashes
   };
-  writeFileWithPerms(
-    path.join(targetDir, '.claude', 'context-forge.json'),
-    JSON.stringify(manifest, null, 2) + '\n'
-  );
+  ensureDir(path.dirname(manifestPath));
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+  result.files.push(path.relative(targetDir, manifestPath));
 
-  return createdFiles;
+  return result;
 }

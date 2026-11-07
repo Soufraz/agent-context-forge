@@ -6,7 +6,7 @@ import os from 'node:os';
 
 import { inspectDirectory } from '../src/detector.js';
 import { generateProjectContext } from '../src/context-generator.js';
-import { scaffoldProject } from '../src/scaffolder.js';
+import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 
@@ -49,7 +49,7 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
   test('scaffoldProject: generates fully configured harness with executable permissions', () => {
     const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_scaffold_'));
 
-    const createdFiles = scaffoldProject(tmpProject, {
+    const { files: createdFiles } = scaffoldProject(tmpProject, {
       engine: 'claude',
       lsp: 'native',
       masking: 'rtk',
@@ -96,6 +96,68 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.equal(manifest.engine, 'claude');
     assert.equal(manifest.episodicMemory, 'context-mode');
     assert.equal(manifest.sdd, 'gsd');
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('scaffoldProject: never destroys existing user files on install', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_existing_'));
+    const claudeDir = path.join(tmpProject, '.claude');
+    fs.mkdirSync(claudeDir);
+    fs.writeFileSync(path.join(tmpProject, 'CLAUDE.md'), '# My hand-written rules\n');
+    fs.writeFileSync(
+      path.join(claudeDir, 'settings.json'),
+      JSON.stringify({
+        permissions: { allow: ['Bash(make:*)'], deny: ['Read(./secrets/**)'] },
+        hooks: {
+          Stop: [{ hooks: [{ type: 'command', command: 'my-stop.sh' }] }],
+          PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'my-bash-guard.sh' }] }]
+        }
+      })
+    );
+
+    const { backups, proposals } = scaffoldProject(tmpProject, { subagentIsolation: 'guardrail' });
+
+    // User-owned CLAUDE.md is kept; ours is proposed alongside it
+    assert.equal(fs.readFileSync(path.join(tmpProject, 'CLAUDE.md'), 'utf-8'), '# My hand-written rules\n');
+    assert.ok(proposals.includes(`CLAUDE.md${PROPOSAL_SUFFIX}`));
+    assert.ok(fs.existsSync(path.join(tmpProject, `CLAUDE.md${PROPOSAL_SUFFIX}`)));
+
+    // settings.json is merged, not replaced, and the original is backed up
+    const settings = JSON.parse(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf-8'));
+    assert.deepEqual(settings.permissions.allow, ['Bash(make:*)']);
+    assert.ok(settings.permissions.deny.includes('Read(./secrets/**)'));
+    assert.ok(settings.permissions.deny.some((r) => r.includes('lock')));
+    assert.equal(settings.hooks.Stop[0].hooks[0].command, 'my-stop.sh');
+    const preToolCommands = settings.hooks.PreToolUse.flatMap((g) => g.hooks.map((h) => h.command));
+    assert.ok(preToolCommands.includes('my-bash-guard.sh'));
+    assert.ok(preToolCommands.some((c) => c.includes('guard-subagent-isolation.py')));
+    assert.ok(backups.includes(path.join('.claude', 'settings.json.bak')));
+
+    // Re-running does not duplicate harness hooks or create more backups
+    const second = scaffoldProject(tmpProject, { subagentIsolation: 'guardrail' });
+    const settingsAgain = JSON.parse(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf-8'));
+    assert.deepEqual(settingsAgain, settings);
+    assert.equal(second.backups.length, 0);
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('scaffoldProject: upgrades user-owned files only when unedited since last install', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_upgrade_'));
+    const ctx = (description) => ({ projectName: 'App', description, techStack: 'Go' });
+
+    scaffoldProject(tmpProject, { projectContext: ctx('first') });
+    // Unedited since install: a re-install with new content replaces it
+    const second = scaffoldProject(tmpProject, { projectContext: ctx('second') });
+    assert.ok(fs.readFileSync(path.join(tmpProject, 'AGENTS.md'), 'utf-8').includes('second'));
+    assert.equal(second.proposals.length, 0);
+
+    // Edited by the user: kept, and ours is proposed alongside
+    fs.appendFileSync(path.join(tmpProject, 'AGENTS.md'), '\nMy own rule.\n');
+    const third = scaffoldProject(tmpProject, { projectContext: ctx('third') });
+    assert.ok(fs.readFileSync(path.join(tmpProject, 'AGENTS.md'), 'utf-8').includes('My own rule.'));
+    assert.ok(third.proposals.includes(`AGENTS.md${PROPOSAL_SUFFIX}`));
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });

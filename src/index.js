@@ -394,7 +394,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
   const spinner = p.spinner();
   spinner.start('Scaffolding Agent Context Forge harness into repository...');
 
-  const createdFiles = scaffoldProject(targetDir, {
+  const { files, backups, proposals } = scaffoldProject(targetDir, {
     engine,
     lsp,
     masking,
@@ -404,7 +404,17 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     projectContext
   });
 
-  spinner.stop(`Scaffolded ${createdFiles.length} files successfully!`);
+  spinner.stop(`Scaffolded ${files.length} files successfully!`);
+
+  if (backups.length > 0) {
+    p.log.info(`Backed up before changing:\n${backups.map((f) => `  ${f}`).join('\n')}`);
+  }
+  if (proposals.length > 0) {
+    p.log.warn(
+      `Kept your existing files. Our versions were written alongside them for you to merge by hand:\n` +
+        proposals.map((f) => `  ${f}`).join('\n')
+    );
+  }
 
   // Run doctor check inline if possible
   const doctorScript = path.join(targetDir, 'scripts', 'agent-gates', 'doctor.sh');

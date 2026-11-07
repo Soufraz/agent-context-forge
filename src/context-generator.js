@@ -8,6 +8,37 @@
  * - Valid relative file path pointers
  */
 
+/**
+ * The CLAUDE.md section for the chosen SDD / planning methodology, or '' for none.
+ *
+ * @param {string} sdd Methodology id from the wizard
+ * @param {number} number Section number to use in the heading
+ */
+export function buildSddSection(sdd, number) {
+  if (sdd === 'superpowers') {
+    return `
+## ${number}. Planning & SDD Methodology: Superpowers
+- **Subagent-Driven Development:** Follow the [Superpowers SDD](https://github.com/obra/superpowers) red-green-refactor workflow.
+- **Subagent Spawning:** When delegating tasks to subagents, provide explicit spec boundaries and expect <250 words summary with file:line pointers.`;
+  } else if (sdd === 'gsd') {
+    return `
+## ${number}. Planning & SDD Methodology: GetShitDone (GSD)
+- **Spec-Driven Workflow:** Follow [GetShitDone](https://github.com/open-gsd/gsd-core) contract-first task phases (Discuss -> Plan -> Execute -> Verify).
+- **Context Isolation:** Keep primary chat flat; execute plan tasks in isolated subagents.`;
+  } else if (sdd === 'ecc') {
+    return `
+## ${number}. Planning & SDD Methodology: Everything Claude Code (ECC)
+- **PDCA Engineering Loop:** Follow [ECC](https://github.com/affaan-m/everything-claude-code) Plan-Test-Implement-Review-Verify cycles.
+- **Workflow Skills:** Leverage specialized sub-agents and modular skills without dirtying the root prefix.`;
+  } else if (sdd === 'elephant-goldfish') {
+    return `
+## ${number}. Planning & SDD Methodology: Elephant-Goldfish Model (EGM)
+- **The Elephant:** Long-horizon architectural memory lives on disk (specifications, ADRs, schemas).
+- **The Goldfish:** Fresh, zero-context reviewers evaluated cold without conversational bias. See [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model).`;
+  }
+  return '';
+}
+
 export function generateProjectContext(options = {}) {
   const {
     projectName = 'My Project',
@@ -21,28 +52,7 @@ export function generateProjectContext(options = {}) {
   } = options;
 
   // 1. Build SDD Section for CLAUDE.md if requested
-  let sddSection = '';
-  if (sdd === 'superpowers') {
-    sddSection = `
-## 3. Planning & SDD Methodology: Superpowers
-- **Subagent-Driven Development:** Follow the [Superpowers SDD](https://github.com/obra/superpowers) red-green-refactor workflow.
-- **Subagent Spawning:** When delegating tasks to subagents, provide explicit spec boundaries and expect <250 words summary with file:line pointers.`;
-  } else if (sdd === 'gsd') {
-    sddSection = `
-## 3. Planning & SDD Methodology: GetShitDone (GSD)
-- **Spec-Driven Workflow:** Follow [GetShitDone](https://github.com/open-gsd/gsd-core) contract-first task phases (Discuss -> Plan -> Execute -> Verify).
-- **Context Isolation:** Keep primary chat flat; execute plan tasks in isolated subagents.`;
-  } else if (sdd === 'ecc') {
-    sddSection = `
-## 3. Planning & SDD Methodology: Everything Claude Code (ECC)
-- **PDCA Engineering Loop:** Follow [ECC](https://github.com/affaan-m/everything-claude-code) Plan-Test-Implement-Review-Verify cycles.
-- **Workflow Skills:** Leverage specialized sub-agents and modular skills without dirtying the root prefix.`;
-  } else if (sdd === 'elephant-goldfish') {
-    sddSection = `
-## 3. Planning & SDD Methodology: Elephant-Goldfish Model (EGM)
-- **The Elephant:** Long-horizon architectural memory lives on disk (specifications, ADRs, schemas).
-- **The Goldfish:** Fresh, zero-context reviewers evaluated cold without conversational bias. See [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model).`;
-  }
+  const sddSection = buildSddSection(sdd, 3);
 
   // 2. Memory instructions
   const memoryNote =

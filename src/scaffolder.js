@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateProjectContext } from './context-generator.js';
+import { buildSddSection, generateProjectContext } from './context-generator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
@@ -367,9 +367,12 @@ export function scaffoldProject(targetDir, options = {}) {
       'user'
     );
   } else {
+    // The starter CLAUDE.md has sections 1-4; the chosen methodology becomes section 5
+    const sddSection = buildSddSection(sdd, 5);
+    const starterClaudeMd = fs.readFileSync(path.join(PACKAGE_ROOT, 'CLAUDE.md'), 'utf-8');
     writeFileWithPerms(
       path.join(targetDir, 'CLAUDE.md'),
-      withAgentsImport(fs.readFileSync(path.join(PACKAGE_ROOT, 'CLAUDE.md'), 'utf-8')),
+      withAgentsImport(sddSection ? `${starterClaudeMd.trimEnd()}\n${sddSection}\n` : starterClaudeMd),
       false,
       'user'
     );

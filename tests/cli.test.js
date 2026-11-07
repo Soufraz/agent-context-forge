@@ -216,6 +216,15 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
+  test('scaffoldProject: the SDD choice reaches CLAUDE.md without custom project context', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_sdd_'));
+    scaffoldProject(tmpProject, { sdd: 'gsd' });
+    const claudeMd = fs.readFileSync(path.join(tmpProject, 'CLAUDE.md'), 'utf-8');
+    assert.ok(claudeMd.includes('## 5. Planning & SDD Methodology: GetShitDone (GSD)'));
+    assert.ok(claudeMd.includes('## 4. Coding & Commit Standards'));
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
   test('auditPillar1: dead path check flags missing files, not expressions or generated output', () => {
     const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_deadpaths_'));
     execSync('git init -q', { cwd: tmpProject });

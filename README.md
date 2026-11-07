@@ -1,7 +1,7 @@
 # 🛠️ Agent Context Forge
 ### *An open boilerplate and quality harness for sustainable AI-assisted software development*
 
-[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillar%201%20Ready-success)](#roadmap--future-solutions)
+[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201%20%26%202%20Ready-success)](#roadmap--future-solutions)
 [![Platform](https://img.shields.io/badge/Portability-Claude%20%7C%20OpenCode%20%7C%20Antigravity%20%7C%20Universal%20Git-blue)](#universal-agent-portability)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -11,7 +11,7 @@ An open-source starting point for modern projects, designed to help developers a
 
 ## 🤝 What We Are Solving Together
 
-As developers increasingly pair with AI coding agents (such as Claude Code, OpenCode, Cursor, and Antigravity) on growing codebases, a common challenge emerges: **context management over time**.
+As developers increasingly pair with AI coding agents on growing codebases, a common challenge emerges: **context management over time**.
 
 When projects scale, it becomes tricky to keep agents aligned with the codebase without overloading them:
 1. **Keeping Instructions Fresh & Aligned:** As architectures and features evolve, instructions in agent rules, skills, and documentation can unintentionally drift or contradict each other.
@@ -37,21 +37,21 @@ Our guiding principle is simple: **treat the active context window like working 
 │  Pillar 1    │   │  Pillar 2    │   │  Pillar 3    │   │  Pillar 4    │   │  Pillar 5    │
 │    Prefix    │   │ Progressive  │   │ Observation  │   │  Episodic    │   │Deterministic │
 │  Stability   │   │  Disclosure  │   │   Masking    │   │    Memory    │   │ Architecture │
-│   [ACTIVE]   │   │  [PLANNED]   │   │  [PLANNED]   │   │  [PLANNED]   │   │  [PLANNED]   │
+│   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │   │  [PLANNED]   │   │  [PLANNED]   │
 └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
 | Pillar | Focus | Status | Description |
 | :--- | :--- | :--- | :--- |
 | **1. Prefix Stability** | Token Caching & Drift Gate | ✅ **Implemented** | Strict immutability for Tier 1 root context; pre-commit gate blocking volatile state and drift. |
-| **2. Progressive Disclosure** | AST & Symbol Navigation | 🚧 *Planned* | LSP / Tree-sitter MCP integration to query interfaces without reading whole file bodies. |
+| **2. Progressive Disclosure** | Language Server Protocol (LSP) | ✅ **Implemented** | `ENABLE_LSP_TOOL=1` + `SessionStart` pre-flight check for compiler-backed symbol navigation. |
 | **3. Observation Masking** | Tool Output Trimming | 🚧 *Planned* | Terminal/test runner proxy that collapses raw stdout into compact failure diffs. |
 | **4. Episodic Memory** | Cross-Session Learning | 🚧 *Planned* | Background memory ledger capturing debug insights across git worktrees without touching prefix files. |
 | **5. Deterministic Gates** | Architectural Linters | 🚧 *Planned* | AST graph boundary checks replacing fuzzy negative prompt instructions with hard CI rules. |
 
 ---
 
-## ⚡ Pillar 1 (Current Foundation): Prefix Stability Gate
+## ⚡ Pillar 1: Prefix Stability Gate
 
 The foundation of every project is **Prefix Stability**: keeping the root prompt prefix frozen and cache-friendly (>80% KV cache hit rate).
 
@@ -69,6 +69,19 @@ Before any `git commit` is finalized by an agent:
   - Delta-only compliance (no duplicate instructions between Tier 1 and Tier 2).
   - Broken file path references or nonexistent package scripts.
 - **Enforcement:** If violations are detected, the gate exits with code `2`, blocking the commit and returning actionable feedback so the agent fixes the context drift automatically.
+
+---
+
+## 🔍 Pillar 2: Progressive Disclosure via Native LSP
+
+Instead of reading 400-line files or guessing line numbers via `grep`, coding agents perform best when equipped with the **Language Server Protocol (LSP)**.
+
+### How It Works in This Boilerplate
+1. **Native LSP Flag:** `.claude/settings.json` exports `"env": { "ENABLE_LSP_TOOL": "1" }`, activating Claude Code's native code intelligence engine.
+2. **Instant Symbol Resolution:** Rather than dumping entire source files into context RAM, the agent queries:
+   - **`LSPGoToDefinition`** & **`LSPFindReferences`**: Resolves symbols across files in ~50ms.
+   - **`LSPDocumentSymbols`** & **`LSPWorkspaceSymbols`**: Inspects interface shapes and function signatures without loading implementation bodies (~70% token savings).
+3. **`SessionStart` Pre-Flight Doctor:** A non-blocking startup hook (`scripts/agent-gates/check-lsp.sh`) detects the project's language (TypeScript, Python, Go, Rust) and confirms the language server binary (`@vtsls/language-server`, `pyright`, `gopls`, `rust-analyzer`) is present on `PATH`. If missing, it provides copy-paste install commands right in the agent's startup console.
 
 ---
 
@@ -126,7 +139,7 @@ agent-context-forge/
 ## 🗺️ Roadmap & Future Solutions
 
 - [x] **Pillar 1:** Universal Prefix Stability & Pre-Commit Hook (Active)
-- [ ] **Pillar 2:** AST / Symbol Code-Graph MCP Integration (`Serena` / `mcp-language-server`)
+- [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol (Active)
 - [ ] **Pillar 3:** Terminal Output Compression & Test Trimming Proxy (`rtk` / `oo`)
 - [ ] **Pillar 4:** Background Episodic Memory Ledger (`claude-mem` integration with cache-protection)
 - [ ] **Pillar 5:** Deterministic Monorepo / Boundary Linters (`dependency-cruiser` configs)

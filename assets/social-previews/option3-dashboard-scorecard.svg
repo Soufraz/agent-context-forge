@@ -56,7 +56,7 @@
         PAIRS SEAMLESSLY WITH ANY METHODOLOGY:
       </text>
       <text x="0" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">
-        Superpowers SDD &bull; GetShitDone (GSD) &bull; ECC &bull; Elephant-Goldfish &bull; TDD
+        Superpowers SDD • GetShitDone (GSD) • ECC • Elephant-Goldfish • TDD
       </text>
     </g>
   </g>
@@ -71,7 +71,7 @@
     <circle cx="20" cy="19" r="5" fill="#ef4444" />
     <circle cx="36" cy="19" r="5" fill="#f59e0b" />
     <circle cx="52" cy="19" r="5" fill="#10b981" />
-    <text x="280" y="24" font-family="ui-monospace, monospace" font-size="11" fill="#64748b" text-anchor="middle">.agent-context-report.html &bull; Live Audit</text>
+    <text x="280" y="24" font-family="ui-monospace, monospace" font-size="11" fill="#64748b" text-anchor="middle">.agent-context-report.html • Live Audit</text>
 
     <!-- Score Header -->
     <g transform="translate(30, 60)">

@@ -35,11 +35,19 @@
     .header h1 { font-size: 24px; font-weight: 700; }
     .header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
     
+    .tabs-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1280px;
+      margin: 0 auto 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
     .tabs {
       display: flex;
       gap: 10px;
-      max-width: 1280px;
-      margin: 0 auto 20px;
+      flex-wrap: wrap;
     }
     .tab-btn {
       background: var(--card-bg);
@@ -58,15 +66,28 @@
       color: var(--accent);
       border-color: var(--accent);
     }
+    .raw-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      background: #082f49;
+      border: 1px solid #0284c7;
+      padding: 8px 14px;
+      border-radius: 6px;
+    }
+    .raw-link:hover { background: #0369a1; }
 
-    .preview-wrapper {
+    .preview-container {
       max-width: 1280px;
       margin: 0 auto;
       border-radius: 12px;
       overflow: hidden;
       border: 2px solid #334155;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
       background: #000;
+      display: flex;
+      justify-content: center;
     }
     .preview-frame {
       width: 1280px;
@@ -81,57 +102,73 @@
       background: #0b1329;
       border: 1px solid #1e3a8a;
       border-radius: 10px;
-      padding: 16px 20px;
+      padding: 18px 24px;
       font-size: 14px;
       color: #93c5fd;
     }
     .instructions strong { color: #fff; }
     .instructions ol { margin-left: 20px; margin-top: 8px; }
-    .instructions li { margin-bottom: 4px; }
+    .instructions li { margin-bottom: 6px; }
+    code {
+      background: #172554;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #67e8f9;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
       <h1>🖼️ GitHub Social Preview Selector (1280 × 640 px)</h1>
-      <p>Choose your favorite visual style below, take a screenshot of the frame, and upload to GitHub Settings.</p>
+      <p>All 3 SVG options are validated XML and rendered below at exact 2:1 GitHub aspect ratio.</p>
     </div>
     <div style="font-size: 13px; color: #10b981; font-weight: 600;">
-      ✓ Exact 2:1 Aspect Ratio (1280x640)
+      ✓ Exact 1280 × 640 px
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchOption(1)">Option 1: Terminal & 2-Layer Foundation</button>
-    <button class="tab-btn" onclick="switchOption(2)">Option 2: The 5-Pillar Architecture Diagram</button>
-    <button class="tab-btn" onclick="switchOption(3)">Option 3: Auditor Scorecard & Metrics</button>
+  <div class="tabs-bar">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchOption(1)">Option 1: Terminal &amp; 2-Layer Foundation</button>
+      <button class="tab-btn" onclick="switchOption(2)">Option 2: 5-Pillar Architecture</button>
+      <button class="tab-btn" onclick="switchOption(3)">Option 3: Auditor Scorecard &amp; Metrics</button>
+    </div>
+    <div>
+      <a id="rawLink" class="raw-link" href="option1-developer-terminal.svg" target="_blank">Open Raw SVG in New Tab ↗</a>
+    </div>
   </div>
 
-  <div class="preview-wrapper">
-    <img id="previewImg" class="preview-frame" src="option1-developer-terminal.svg" alt="Social Preview">
+  <div class="preview-container">
+    <img id="previewImg" class="preview-frame" src="option1-developer-terminal.svg?v=2" alt="Social Preview 1280x640">
   </div>
 
   <div class="instructions">
     <strong>📸 How to upload to GitHub:</strong>
     <ol>
-      <li>Pick the design option you like best above.</li>
-      <li>Take a screenshot of the 1280×640 image frame (macOS: <code>Cmd + Shift + 4</code>, spacebar, click the frame; or right-click the image and save).</li>
-      <li>Go to your GitHub repository: <strong>Settings → General → Social preview</strong>.</li>
-      <li>Click <strong>Edit → Upload an image</strong> and select your saved image!</li>
+      <li>Click between the 3 tabs above to choose your favorite look.</li>
+      <li><strong>Screenshot option:</strong> Take a screenshot of the 1280×640 image frame (on Mac: press <code>Cmd + Shift + 4</code>, then <code>Spacebar</code>, and click the image frame).</li>
+      <li><strong>Or open raw:</strong> Click <strong>"Open Raw SVG in New Tab"</strong> to view or save the standalone file.</li>
+      <li>Go to your repository: <strong>Settings → General → Social preview</strong> (or <a href="https://github.com/Soufraz/agent-context-forge/settings" target="_blank" style="color:#38bdf8;">github.com/Soufraz/agent-context-forge/settings</a>).</li>
+      <li>Click <strong>Edit → Upload an image</strong> and select your file!</li>
     </ol>
   </div>
 
   <script>
+    const files = [
+      'option1-developer-terminal.svg',
+      'option2-five-pillars.svg',
+      'option3-dashboard-scorecard.svg'
+    ];
+
     function switchOption(num) {
       document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
         btn.classList.toggle('active', idx === num - 1);
       });
-      const files = [
-        'option1-developer-terminal.svg',
-        'option2-five-pillars.svg',
-        'option3-dashboard-scorecard.svg'
-      ];
-      document.getElementById('previewImg').src = files[num - 1];
+      const selected = files[num - 1] + '?t=' + Date.now();
+      document.getElementById('previewImg').src = selected;
+      document.getElementById('rawLink').href = files[num - 1];
     }
   </script>
 </body>

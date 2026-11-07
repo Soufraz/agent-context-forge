@@ -30,7 +30,7 @@
       🛠️ Agent Context Forge
     </text>
     <text x="0" y="102" font-family="-apple-system, system-ui, sans-serif" font-size="18" font-weight="500" fill="#94a3b8">
-      The 5 Pillars of Context Architecture &bull; Stop Token Bloat &bull; Keep LLM Reasoning Sharp
+      The 5 Pillars of Context Architecture • Stop Token Bloat • Keep LLM Reasoning Sharp
     </text>
 
     <rect x="870" y="45" width="250" height="44" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
@@ -41,7 +41,7 @@
   <g transform="translate(80, 215)">
     <rect x="0" y="0" width="1120" height="52" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1.5" />
     <text x="560" y="32" font-family="-apple-system, system-ui, sans-serif" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="middle">
-      🧠 <tspan fill="#38bdf8">LLM Context Window = RAM</tspan> (Fast, Flat &amp; Frozen) &nbsp;|&nbsp; <tspan fill="#a5b4fc">Repository, LSP &amp; Memory = Disk</tspan> (Queried on Demand)
+      🧠 <tspan fill="#38bdf8">LLM Context Window = RAM</tspan> (Fast, Flat &amp; Frozen) | <tspan fill="#a5b4fc">Repository, LSP &amp; Memory = Disk</tspan> (Queried on Demand)
     </text>
   </g>
 
@@ -52,7 +52,7 @@
     <rect x="0" y="0" width="208" height="6" rx="3" fill="#38bdf8" />
     <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#38bdf8" letter-spacing="0.5">PILLAR 1</text>
     <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Prefix Stability</text>
-    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8" line-height="1.4">
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">
       Frozen Tier-1 prefix (&lt;150 lines). Zero task state.
     </text>
     
@@ -124,7 +124,7 @@
   <!-- Footer Info -->
   <g transform="translate(80, 595)">
     <text x="0" y="0" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#64748b">
-      Open-source MIT License &bull; Zero Telemetry &bull; GitHub: Soufraz/agent-context-forge &bull; npm: agent-context-forge
+      Open-source MIT License • Zero Telemetry • GitHub: Soufraz/agent-context-forge • npm: agent-context-forge
     </text>
   </g>
 </svg>

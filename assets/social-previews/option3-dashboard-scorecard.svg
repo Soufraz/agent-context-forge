@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bgGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="60%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="scoreGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bgGrad3)" />
+
+  <!-- Left Column: Branding, Value Prop & Terminal -->
+  <g transform="translate(80, 80)">
+    <rect x="0" y="0" width="140" height="26" rx="13" fill="#1e293b" stroke="#3b82f6" stroke-width="1.2" />
+    <text x="70" y="17" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#60a5fa" text-anchor="middle">CLI &amp; AUDITOR</text>
+
+    <text x="0" y="70" font-family="-apple-system, system-ui, sans-serif" font-size="46" font-weight="800" fill="#ffffff" letter-spacing="-1">
+      🛠️ Agent Context Forge
+    </text>
+    <text x="0" y="110" font-family="-apple-system, system-ui, sans-serif" font-size="20" font-weight="500" fill="#94a3b8">
+      Audit your repo's context health in &lt; 2 seconds.
+    </text>
+
+    <!-- Command Snippet -->
+    <g transform="translate(0, 150)">
+      <rect x="0" y="0" width="480" height="64" rx="10" fill="#030712" stroke="#1e293b" stroke-width="1.5" />
+      <text x="24" y="38" font-family="ui-monospace, monospace" font-size="19" font-weight="700" fill="#38bdf8">
+        $ npx agent-context-forge
+      </text>
+    </g>
+
+    <!-- Bullets -->
+    <g transform="translate(0, 250)">
+      <text x="0" y="0" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#cbd5e1">
+        <tspan fill="#10b981" font-weight="800">✓</tspan> Prevents prompt cache busting in CLAUDE.md
+      </text>
+      <text x="0" y="28" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#cbd5e1">
+        <tspan fill="#10b981" font-weight="800">✓</tspan> Hard Read denials on 80k-token lockfiles
+      </text>
+      <text x="0" y="56" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#cbd5e1">
+        <tspan fill="#10b981" font-weight="800">✓</tspan> RTK test stdout compression (~60–90% savings)
+      </text>
+      <text x="0" y="84" font-family="-apple-system, system-ui, sans-serif" font-size="14" fill="#cbd5e1">
+        <tspan fill="#10b981" font-weight="800">✓</tspan> 10-call exploration guardrail forces subagent dispatch
+      </text>
+    </g>
+
+    <!-- Framework Tags -->
+    <g transform="translate(0, 385)">
+      <text x="0" y="0" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#64748b" letter-spacing="0.5">
+        PAIRS SEAMLESSLY WITH ANY METHODOLOGY:
+      </text>
+      <text x="0" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="600" fill="#94a3b8">
+        Superpowers SDD &bull; GetShitDone (GSD) &bull; ECC &bull; Elephant-Goldfish &bull; TDD
+      </text>
+    </g>
+  </g>
+
+  <!-- Right Column: Visual HTML Report Scorecard Mockup -->
+  <g transform="translate(640, 70)">
+    <!-- Dashboard Card Outer -->
+    <rect x="0" y="0" width="560" height="500" rx="16" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+
+    <!-- Browser top bar -->
+    <rect x="0" y="0" width="560" height="38" rx="16" fill="#1e293b" />
+    <circle cx="20" cy="19" r="5" fill="#ef4444" />
+    <circle cx="36" cy="19" r="5" fill="#f59e0b" />
+    <circle cx="52" cy="19" r="5" fill="#10b981" />
+    <text x="280" y="24" font-family="ui-monospace, monospace" font-size="11" fill="#64748b" text-anchor="middle">.agent-context-report.html &bull; Live Audit</text>
+
+    <!-- Score Header -->
+    <g transform="translate(30, 60)">
+      <!-- Score Circle Box -->
+      <rect x="0" y="0" width="230" height="130" rx="10" fill="#090d16" stroke="#10b981" stroke-width="1.5" />
+      <text x="20" y="28" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#6ee7b7">CONTEXT HEALTH SCORE</text>
+      <text x="20" y="75" font-family="-apple-system, system-ui, sans-serif" font-size="44" font-weight="800" fill="#10b981">96<tspan font-size="18" fill="#64748b" font-weight="500"> / 100</tspan></text>
+      <rect x="20" y="92" width="75" height="22" rx="4" fill="#064e3b" />
+      <text x="57" y="107" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#34d399" text-anchor="middle">GRADE A</text>
+      <text x="105" y="107" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">Optimal Health</text>
+
+      <!-- Stat Box 1: Cache Hit -->
+      <g transform="translate(250, 0)">
+        <rect x="0" y="0" width="250" height="60" rx="10" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+        <text x="16" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#94a3b8">EST. PROMPT CACHE HIT RATE</text>
+        <text x="16" y="47" font-family="-apple-system, system-ui, sans-serif" font-size="20" font-weight="800" fill="#38bdf8">85% – 95%</text>
+      </g>
+
+      <!-- Stat Box 2: Token Waste Risk -->
+      <g transform="translate(250, 70)">
+        <rect x="0" y="0" width="250" height="60" rx="10" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+        <text x="16" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="700" fill="#94a3b8">TOKEN WASTE RISK</text>
+        <text x="16" y="47" font-family="-apple-system, system-ui, sans-serif" font-size="20" font-weight="800" fill="#10b981">Minimal (&lt; 5%)</text>
+      </g>
+    </g>
+
+    <!-- Mini Pillar Status Bars -->
+    <g transform="translate(30, 215)">
+      <!-- Row 1 -->
+      <rect x="0" y="0" width="500" height="42" rx="6" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+      <text x="16" y="26" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Pillar 1: Prefix Stability (CLAUDE.md)</text>
+      <rect x="420" y="10" width="65" height="22" rx="4" fill="#064e3b" />
+      <text x="452" y="25" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="800" fill="#34d399" text-anchor="middle">30/30 pts</text>
+
+      <!-- Row 2 -->
+      <rect x="0" y="52" width="500" height="42" rx="6" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+      <text x="16" y="78" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Pillar 2: Progressive Disclosure (LSP)</text>
+      <rect x="420" y="62" width="65" height="22" rx="4" fill="#064e3b" />
+      <text x="452" y="77" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="800" fill="#34d399" text-anchor="middle">20/20 pts</text>
+
+      <!-- Row 3 -->
+      <rect x="0" y="104" width="500" height="42" rx="6" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+      <text x="16" y="130" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Pillar 3: Observation Masking (RTK)</text>
+      <rect x="420" y="114" width="65" height="22" rx="4" fill="#064e3b" />
+      <text x="452" y="129" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="800" fill="#34d399" text-anchor="middle">15/15 pts</text>
+
+      <!-- Row 4 -->
+      <rect x="0" y="156" width="500" height="42" rx="6" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+      <text x="16" y="182" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Pillar 4: Subagent Context Isolation</text>
+      <rect x="420" y="166" width="65" height="22" rx="4" fill="#064e3b" />
+      <text x="452" y="181" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="800" fill="#34d399" text-anchor="middle">20/20 pts</text>
+
+      <!-- Row 5 -->
+      <rect x="0" y="208" width="500" height="42" rx="6" fill="#090d16" stroke="#1e293b" stroke-width="1" />
+      <text x="16" y="234" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ffffff">Pillar 5: Episodic Auto-Memory</text>
+      <rect x="420" y="218" width="65" height="22" rx="4" fill="#064e3b" />
+      <text x="452" y="233" font-family="-apple-system, system-ui, sans-serif" font-size="10" font-weight="800" fill="#34d399" text-anchor="middle">15/15 pts</text>
+    </g>
+  </g>
+</svg>

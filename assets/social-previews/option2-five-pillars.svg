@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#030712" />
+      <stop offset="50%" stop-color="#0b1329" />
+      <stop offset="100%" stop-color="#030712" />
+    </linearGradient>
+    <linearGradient id="cyanBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+    <linearGradient id="pillarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bgGrad2)" />
+
+  <!-- Top Decorative Header -->
+  <rect x="0" y="0" width="1280" height="4" fill="url(#cyanBlue)" />
+
+  <!-- Title & Headline -->
+  <g transform="translate(80, 70)">
+    <rect x="0" y="0" width="170" height="28" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" />
+    <text x="85" y="18" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle" letter-spacing="0.5">CONTEXT ENGINEERING</text>
+
+    <text x="0" y="70" font-family="-apple-system, system-ui, sans-serif" font-size="44" font-weight="800" fill="#ffffff" letter-spacing="-1">
+      🛠️ Agent Context Forge
+    </text>
+    <text x="0" y="102" font-family="-apple-system, system-ui, sans-serif" font-size="18" font-weight="500" fill="#94a3b8">
+      The 5 Pillars of Context Architecture &bull; Stop Token Bloat &bull; Keep LLM Reasoning Sharp
+    </text>
+
+    <rect x="870" y="45" width="250" height="44" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1.5" />
+    <text x="995" y="72" font-family="ui-monospace, monospace" font-size="14" font-weight="700" fill="#38bdf8" text-anchor="middle">$ npx agent-context-forge</text>
+  </g>
+
+  <!-- Mental Model Banner (RAM vs Disk) -->
+  <g transform="translate(80, 215)">
+    <rect x="0" y="0" width="1120" height="52" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1.5" />
+    <text x="560" y="32" font-family="-apple-system, system-ui, sans-serif" font-size="15" font-weight="700" fill="#e2e8f0" text-anchor="middle">
+      🧠 <tspan fill="#38bdf8">LLM Context Window = RAM</tspan> (Fast, Flat &amp; Frozen) &nbsp;|&nbsp; <tspan fill="#a5b4fc">Repository, LSP &amp; Memory = Disk</tspan> (Queried on Demand)
+    </text>
+  </g>
+
+  <!-- 5 Pillars Display (5 Columns) -->
+  <!-- Pillar 1 -->
+  <g transform="translate(80, 290)">
+    <rect x="0" y="0" width="208" height="270" rx="10" fill="url(#pillarGrad)" stroke="#334155" stroke-width="1.5" />
+    <rect x="0" y="0" width="208" height="6" rx="3" fill="#38bdf8" />
+    <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#38bdf8" letter-spacing="0.5">PILLAR 1</text>
+    <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Prefix Stability</text>
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8" line-height="1.4">
+      Frozen Tier-1 prefix (&lt;150 lines). Zero task state.
+    </text>
+    
+    <rect x="16" y="195" width="176" height="55" rx="6" fill="#082f49" stroke="#0284c7" stroke-width="1" />
+    <text x="104" y="218" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">PROMPT CACHE</text>
+    <text x="104" y="238" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">&gt; 80% Hit Rate</text>
+  </g>
+
+  <!-- Pillar 2 -->
+  <g transform="translate(308, 290)">
+    <rect x="0" y="0" width="208" height="270" rx="10" fill="url(#pillarGrad)" stroke="#334155" stroke-width="1.5" />
+    <rect x="0" y="0" width="208" height="6" rx="3" fill="#818cf8" />
+    <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#818cf8" letter-spacing="0.5">PILLAR 2</text>
+    <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Progressive LSP</text>
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">
+      Compiler symbol jumps + lockfile Read denials.
+    </text>
+
+    <rect x="16" y="195" width="176" height="55" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+    <text x="104" y="218" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#a5b4fc" text-anchor="middle">SYMBOL QUERIES</text>
+    <text x="104" y="238" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">~70% Savings</text>
+  </g>
+
+  <!-- Pillar 3 -->
+  <g transform="translate(536, 290)">
+    <rect x="0" y="0" width="208" height="270" rx="10" fill="url(#pillarGrad)" stroke="#334155" stroke-width="1.5" />
+    <rect x="0" y="0" width="208" height="6" rx="3" fill="#10b981" />
+    <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#10b981" letter-spacing="0.5">PILLAR 3</text>
+    <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Masking (RTK)</text>
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">
+      Collapses passing tests; preserves 100% diffs.
+    </text>
+
+    <rect x="16" y="195" width="176" height="55" rx="6" fill="#064e3b" stroke="#059669" stroke-width="1" />
+    <text x="104" y="218" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#6ee7b7" text-anchor="middle">TEST STDOUT</text>
+    <text x="104" y="238" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">60–90% Savings</text>
+  </g>
+
+  <!-- Pillar 4 -->
+  <g transform="translate(764, 290)">
+    <rect x="0" y="0" width="208" height="270" rx="10" fill="url(#pillarGrad)" stroke="#334155" stroke-width="1.5" />
+    <rect x="0" y="0" width="208" height="6" rx="3" fill="#f59e0b" />
+    <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#f59e0b" letter-spacing="0.5">PILLAR 4</text>
+    <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Context Isolation</text>
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">
+      10-call search guardrail forces subagent dispatch.
+    </text>
+
+    <rect x="16" y="195" width="176" height="55" rx="6" fill="#451a03" stroke="#d97706" stroke-width="1" />
+    <text x="104" y="218" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#fde68a" text-anchor="middle">EXPLORATION NOISE</text>
+    <text x="104" y="238" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">Flat Context</text>
+  </g>
+
+  <!-- Pillar 5 -->
+  <g transform="translate(992, 290)">
+    <rect x="0" y="0" width="208" height="270" rx="10" fill="url(#pillarGrad)" stroke="#334155" stroke-width="1.5" />
+    <rect x="0" y="0" width="208" height="6" rx="3" fill="#ec4899" />
+    <text x="20" y="35" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#ec4899" letter-spacing="0.5">PILLAR 5</text>
+    <text x="20" y="60" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff">Episodic Memory</text>
+    <text x="20" y="85" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8">
+      Two-tier Auto-Memory + PreCompact protection.
+    </text>
+
+    <rect x="16" y="195" width="176" height="55" rx="6" fill="#500724" stroke="#db2777" stroke-width="1" />
+    <text x="104" y="218" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#fbcfe8" text-anchor="middle">CROSS-SESSION</text>
+    <text x="104" y="238" font-family="-apple-system, system-ui, sans-serif" font-size="16" font-weight="800" fill="#ffffff" text-anchor="middle">Zero Amnesia</text>
+  </g>
+
+  <!-- Footer Info -->
+  <g transform="translate(80, 595)">
+    <text x="0" y="0" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#64748b">
+      Open-source MIT License &bull; Zero Telemetry &bull; GitHub: Soufraz/agent-context-forge &bull; npm: agent-context-forge
+    </text>
+  </g>
+</svg>

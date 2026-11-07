@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 260" width="100%" height="auto" style="max-width: 880px;">
+  <defs>
+    <linearGradient id="layer2Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#2e1065" />
+    </linearGradient>
+    <linearGradient id="layer1Grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="borderGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <linearGradient id="borderGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Container Box -->
+  <rect x="0" y="0" width="880" height="260" rx="14" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5" />
+
+  <!-- LAYER 2 (Workflow & Planning Methodology) -->
+  <g transform="translate(24, 20)">
+    <rect x="0" y="0" width="832" height="92" rx="10" fill="url(#layer2Grad)" stroke="url(#borderGrad2)" stroke-width="1.5" />
+    
+    <rect x="20" y="14" width="76" height="22" rx="4" fill="#312e81" />
+    <text x="58" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="800" fill="#c7d2fe" text-anchor="middle">LAYER 2</text>
+    
+    <text x="106" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="800" fill="#ffffff">Workflow &amp; Planning Methodology</text>
+    
+    <text x="20" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#a5b4fc">
+      Superpowers SDD • GetShitDone (GSD) • Everything Claude Code (ECC) • Elephant-Goldfish • TDD
+    </text>
+    <text x="20" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8">
+      "How you brainstorm, decompose features into specifications, and coordinate coding."
+    </text>
+  </g>
+
+  <!-- Middle Divider / Arrows -->
+  <g transform="translate(0, 118)">
+    <text x="440" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="800" fill="#10b981" text-anchor="middle" letter-spacing="1.5">
+      ▲ ▲ ▲  FOUNDATION LAYER (SITS UNDERNEATH)  ▲ ▲ ▲
+    </text>
+  </g>
+
+  <!-- LAYER 1 (The Context Engineering Harness) -->
+  <g transform="translate(24, 142)">
+    <rect x="0" y="0" width="832" height="98" rx="10" fill="url(#layer1Grad)" stroke="url(#borderGrad1)" stroke-width="1.5" />
+    
+    <rect x="20" y="14" width="76" height="22" rx="4" fill="#065f46" />
+    <text x="58" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="800" fill="#a7f3d0" text-anchor="middle">LAYER 1</text>
+    
+    <text x="106" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="800" fill="#ffffff">The Context Engineering Harness (agent-context-forge)</text>
+    
+    <text x="20" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="700" fill="#6ee7b7">
+      Frozen Prefix Cache Gate • Native Compiler LSP • RTK Output Masking • Subagent Isolation • Auto-Memory
+    </text>
+    <text x="20" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#a7f3d0">
+      "The invisible rails that keep active context lean, prevent token bloat, and stop context rot."
+    </text>
+  </g>
+</svg>

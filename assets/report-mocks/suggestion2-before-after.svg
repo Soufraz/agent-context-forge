@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 460" width="100%" height="auto" style="max-width: 880px;">
+  <defs>
+    <linearGradient id="bgComp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="880" height="460" rx="12" fill="url(#bgComp)" stroke="#1f2937" stroke-width="1.5" />
+
+  <!-- Top Title -->
+  <text x="440" y="40" font-family="-apple-system, system-ui, sans-serif" font-size="20" font-weight="800" fill="#ffffff" text-anchor="middle">
+    5-Pillar Context Audit: What Gets Detected &amp; Fixed
+  </text>
+  <text x="440" y="62" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">
+    Run `npx agent-context-forge` to inspect any repo in &lt; 2 seconds
+  </text>
+
+  <!-- Left: Unprotected Project (Grade F) -->
+  <g transform="translate(30, 85)">
+    <rect x="0" y="0" width="395" height="345" rx="10" fill="#0f172a" stroke="#7f1d1d" stroke-width="1.5" />
+    
+    <!-- Header -->
+    <rect x="0" y="0" width="395" height="42" rx="10" fill="#450a0a" />
+    <text x="20" y="26" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="800" fill="#fca5a5">
+      ⚠️ UNMANAGED PROJECT (NO HARNESS)
+    </text>
+    <rect x="305" y="10" width="75" height="22" rx="4" fill="#7f1d1d" />
+    <text x="342" y="25" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#fecaca" text-anchor="middle">38 / 100</text>
+
+    <!-- Fail Items -->
+    <g transform="translate(18, 62)">
+      <!-- Item 1 -->
+      <rect x="0" y="0" width="359" height="58" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1" />
+      <text x="14" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ef4444">❌ Prompt Cache Thrashing</text>
+      <text x="14" y="42" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#a1a1aa">CLAUDE.md has active checkboxes &amp; dates. Cache hit &lt; 40%.</text>
+
+      <!-- Item 2 -->
+      <rect x="0" y="68" width="359" height="58" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1" />
+      <text x="14" y="90" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ef4444">❌ Unprotected Lockfile Token Bombs</text>
+      <text x="14" y="110" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#a1a1aa">pnpm-lock.yaml (412KB / ~105,000 tokens) is readable.</text>
+
+      <!-- Item 3 -->
+      <rect x="0" y="136" width="359" height="58" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1" />
+      <text x="14" y="158" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ef4444">❌ Test Output Flooding</text>
+      <text x="14" y="178" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#a1a1aa">Passing test suites dump 500+ lines into active RAM.</text>
+
+      <!-- Item 4 -->
+      <rect x="0" y="204" width="359" height="58" rx="6" fill="#18181b" stroke="#3f3f46" stroke-width="1" />
+      <text x="14" y="226" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#ef4444">❌ Attention Dilution &amp; Amnesia</text>
+      <text x="14" y="246" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#a1a1aa">20+ inline greps; /compact summarizer drops file:line pointers.</text>
+    </g>
+  </g>
+
+  <!-- Right: Context-Forged Project (Grade A) -->
+  <g transform="translate(455, 85)">
+    <rect x="0" y="0" width="395" height="345" rx="10" fill="#0f172a" stroke="#059669" stroke-width="1.5" />
+    
+    <!-- Header -->
+    <rect x="0" y="0" width="395" height="42" rx="10" fill="#064e3b" />
+    <text x="20" y="26" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="800" fill="#a7f3d0">
+      ⚡ AGENT CONTEXT FORGE HARNESS ACTIVE
+    </text>
+    <rect x="305" y="10" width="75" height="22" rx="4" fill="#047857" />
+    <text x="342" y="25" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#ecfdf5" text-anchor="middle">98 / 100</text>
+
+    <!-- Pass Items -->
+    <g transform="translate(18, 62)">
+      <!-- Item 1 -->
+      <rect x="0" y="0" width="359" height="58" rx="6" fill="#06281e" stroke="#065f46" stroke-width="1" />
+      <text x="14" y="22" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#10b981">✓ Frozen Prefix Cache Gate</text>
+      <text x="14" y="42" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#6ee7b7">Tier-1 compact (&lt;150 lines); prompt cache hits &gt; 85–95%.</text>
+
+      <!-- Item 2 -->
+      <rect x="0" y="68" width="359" height="58" rx="6" fill="#06281e" stroke="#065f46" stroke-width="1" />
+      <text x="14" y="90" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#10b981">✓ Native LSP + Token-Bomb Denials</text>
+      <text x="14" y="110" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#6ee7b7">Compiler symbol queries; permissions.deny blocks lockfiles.</text>
+
+      <!-- Item 3 -->
+      <rect x="0" y="136" width="359" height="58" rx="6" fill="#06281e" stroke="#065f46" stroke-width="1" />
+      <text x="14" y="158" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#10b981">✓ RTK Observation Masking</text>
+      <text x="14" y="178" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#6ee7b7">Passing tests collapsed into 1 line; 100% failure diffs kept.</text>
+
+      <!-- Item 4 -->
+      <rect x="0" y="204" width="359" height="58" rx="6" fill="#06281e" stroke="#065f46" stroke-width="1" />
+      <text x="14" y="226" font-family="-apple-system, system-ui, sans-serif" font-size="12" font-weight="700" fill="#10b981">✓ Subagent Isolation &amp; PreCompact</text>
+      <text x="14" y="246" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#6ee7b7">10-call guardrail blocks noise; PreCompact retains exact lines.</text>
+    </g>
+  </g>
+</svg>

@@ -1,7 +1,7 @@
 # 🛠️ Agent Context Forge
 ### *An open boilerplate and quality harness for sustainable AI-assisted software development*
 
-[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201--4%20Ready-success)](#roadmap--future-solutions)
+[![Context Status](https://img.shields.io/badge/Context%20Engineering-All%205%20Pillars%20Ready-success)](#roadmap--future-solutions)
 [![Platform](https://img.shields.io/badge/Portability-Claude%20%7C%20OpenCode%20%7C%20Antigravity%20%7C%20Universal%20Git-blue)](#universal-agent-portability)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -37,7 +37,7 @@ Our guiding principle is simple: **treat the active context window like working 
 │  Pillar 1    │   │  Pillar 2    │   │  Pillar 3    │   │  Pillar 4    │   │  Pillar 5    │
 │    Prefix    │   │ Progressive  │   │ Observation  │   │   Context    │   │  Episodic    │
 │  Stability   │   │  Disclosure  │   │   Masking    │   │  Isolation   │   │    Memory    │
-│   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │
+│   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │
 └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
@@ -47,7 +47,7 @@ Our guiding principle is simple: **treat the active context window like working 
 | **2. Progressive Disclosure** | Language Server Protocol (LSP) | ✅ **Implemented** | `ENABLE_LSP_TOOL=1` + `SessionStart` pre-flight check for compiler-backed symbol navigation. |
 | **3. Observation Masking** | Smart Tool Output Compression | ✅ **Implemented** | `rtk` (Rust Token Killer) doctor check + proxying to collapse test/build noise (~60–90% savings). |
 | **4. Context Isolation** | Subagent Trajectory Separation | ✅ **Implemented** | Runaway exploration guardrails + orchestrator permission scoping to keep primary context flat. |
-| **5. Episodic Memory** | Cross-Session Learning | 🚧 *Planned* | Background memory ledger capturing debug insights across git worktrees without touching prefix files. |
+| **5. Episodic Memory** | Cross-Session Learning | ✅ **Implemented** | Two-tier Auto-Memory (`MEMORY.md` + topic files) verified via `check-memory.sh` on session start. |
 
 ---
 
@@ -121,6 +121,19 @@ For large-scale feature planning, you can enforce context isolation structurally
 
 ---
 
+## 🧠 Pillar 5: Episodic Memory (Cross-Session Learning)
+
+Coding agents shouldn't suffer from amnesia between sessions, but storing past lessons and debugging insights directly in `CLAUDE.md` breaks **Prefix Stability (Pillar 1)** by constantly busting the prompt cache.
+
+### How It Works in This Boilerplate
+1. **Built-in Two-Tier Memory:** Relies on Claude Code's native Auto-Memory located machine-locally in `~/.claude/projects/<slug>/memory/`.
+   - **`MEMORY.md` Index:** Only the top ~200 lines (~25KB) are loaded at session startup as a lightweight catalog.
+   - **Topic Markdown Files:** Detailed debugging findings and user corrections are stored in separate topic files and read lazily on demand.
+2. **Environment Doctor Verification:** `scripts/agent-gates/check-memory.sh` runs automatically on `SessionStart` (via `doctor.sh`), verifying that auto-memory is enabled and reporting how many memory topics are currently active.
+3. **Pluggable Architecture:** While native Auto-Memory is the zero-dependency default, teams with heavy cross-worktree or sandboxed execution needs can easily plug in external MCP memory layers like [`claude-mem`](https://github.com/thedotmack/claude-mem) or [`context-mode`](https://github.com/mksglu/context-mode).
+
+---
+
 ## 🌐 Universal Agent Portability
 
 This boilerplate is designed to be **agent-agnostic**. While the initial hook is wired for Claude Code, the core quality gates sit in a portable layer ready to plug into any agent platform:
@@ -145,7 +158,8 @@ agent-context-forge/
 │   └── agent-gates/                     # Portable, tool-agnostic validation logic
 │       ├── doctor.sh                    # Unified environment pre-flight doctor
 │       ├── check-lsp.sh                 # Language Server Protocol readiness (Pillar 2)
-│       └── check-rtk.sh                 # Observation masking check (Pillar 3)
+│       ├── check-rtk.sh                 # Observation masking check (Pillar 3)
+│       └── check-memory.sh              # Episodic memory verification (Pillar 5)
 │
 └── README.md
 ```
@@ -184,7 +198,8 @@ agent-context-forge/
 - [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol (Active)
 - [x] **Pillar 3:** Smart Observation Masking via `rtk` (Active)
 - [x] **Pillar 4:** Subagent Context Isolation & Exploration Guardrails (Active)
-- [ ] **Pillar 5:** Background Episodic Memory Ledger (`claude-mem` integration with cache-protection)
+- [x] **Pillar 5:** Episodic Memory via Two-Tier Auto-Memory (Active)
+- [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.
 - [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.
 
 ---

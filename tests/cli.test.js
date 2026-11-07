@@ -9,6 +9,11 @@ import { generateProjectContext } from '../src/context-generator.js';
 import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
+import {
+  auditPillar4,
+  parseAgentFrontmatter,
+  writeToolsGranted
+} from '../src/scanner/pillar4-isolation.js';
 
 describe('Agent Context Forge CLI & Scanner Suite', () => {
   test('inspectDirectory: correctly classifies empty and populated folders', () => {
@@ -158,6 +163,28 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     const third = scaffoldProject(tmpProject, { projectContext: ctx('third') });
     assert.ok(fs.readFileSync(path.join(tmpProject, 'AGENTS.md'), 'utf-8').includes('My own rule.'));
     assert.ok(third.proposals.includes(`AGENTS.md${PROPOSAL_SUFFIX}`));
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('auditPillar4: orchestrator scoping follows the real `tools` frontmatter, not comments', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_pillar4_'));
+    scaffoldProject(tmpProject, { subagentIsolation: 'both' });
+    const shipped = auditPillar4(tmpProject);
+    assert.equal(shipped.score, shipped.maxScore, 'the shipped orchestrator must pass our own scanner');
+
+    const agentPath = path.join(tmpProject, '.claude', 'agents', 'orchestrator.md');
+    fs.writeFileSync(
+      agentPath,
+      '---\nname: orchestrator\ndescription: x\nallowed_tools:\n  - Read\n  - Agent\n---\nNever use Edit or Write.\n'
+    );
+    const ignoredKey = auditPillar4(tmpProject);
+    assert.ok(ignoredKey.findings.some((f) => f.title.includes('allowed_tools')));
+    assert.ok(ignoredKey.findings.some((f) => f.title.includes('Lacks Permission Scoping')));
+
+    assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ntools: Read, Agent\n---\n')), []);
+    assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ndisallowedTools: Edit, Write\n---\n')), []);
+    assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ntools:\n  - Read\n  - Edit\n---\n')), ['Edit']);
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });

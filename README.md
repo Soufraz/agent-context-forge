@@ -94,7 +94,7 @@ Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-rep
 Lets you customize each layer instead of forcing a rigid template:
 * **Progressive Disclosure:** Claude Native LSP *(default)* or bring your own code-intelligence MCP/tool.
 * **Observation Masking:** [`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) *(default)* or custom output filter.
-* **Subagent Isolation:** `10-call` Exploration Guardrail Hook *(default)*, Orchestrator Tool Permission Scoping (`.claude/agents/orchestrator.md` with `Edit`/`Write` physically omitted), or both.
+* **Subagent Isolation:** `10-call` Exploration Guardrail Hook *(default)*, Orchestrator Tool Permission Scoping (`.claude/agents/orchestrator.md`, whose `tools` allowlist leaves out `Edit`/`Write`), or both.
 * **Episodic Memory:** Built-in Claude Auto-Memory *(default, zero setup)* or [`context-mode`](https://github.com/mksglu/context-mode) *(sandboxed FTS5/BM25 MCP virtualization)*.
 * **SDD Pairing (Optional):** Pre-wires rules for [Superpowers SDD](https://github.com/obra/superpowers), [GetShitDone (GSD)](https://github.com/open-gsd/gsd-core), [ECC](https://github.com/affaan-m/everything-claude-code), or the [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model).
 * **Custom Context Bootstrapping (Optional):** Describe what you're building right in the CLI to generate a tailored, prefix-stable `CLAUDE.md`, `AGENTS.md`, and `.agents/rules/project-architecture.md`.

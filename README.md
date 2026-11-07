@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Under development.** We're testing and benchmarking Agent Context Forge on real repositories before we publish results. Until those results are out, treat the claims and numbers in this README as unverified, and expect breaking changes.
+
 <div align="center">
 
 # 🛠️ Agent Context Forge

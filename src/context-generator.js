@@ -76,7 +76,7 @@ export function generateProjectContext(options = {}) {
 ${lspNote}
 ${maskingNote}
 - **Token-Bomb Avoidance:** Never \`Read\` lockfiles (\`pnpm-lock.yaml\`, \`package-lock.json\`, \`Cargo.lock\`) or build bundles (\`dist/\`, \`.next/\`).
-- **Subagent Context Isolation:** Delegate multi-file searches (10+ calls) to subagents (\`Task\`) and return only <250 words synthesis.
+- **Subagent Context Isolation:** Delegate multi-file searches (10+ calls) to subagents (\`Agent\` tool) and return only <250 words synthesis.
 ${memoryNote}${sddSection}
 
 ## 4. Key References (On-Demand Pointers)

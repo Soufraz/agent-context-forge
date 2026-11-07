@@ -60,17 +60,37 @@ echo "[5/5] Checking guard-subagent-isolation.py & pre-compact-handover.sh..."
 TEST_SID="test_suite_$$"
 rm -f "/tmp/agent_context_forge/exploration_${TEST_SID}.json"
 
+guard() {
+  printf '{"session_id":"%s","tool_name":"%s"%s}' "$TEST_SID" "$1" "${2:-}" | "$REPO_ROOT/.claude/hooks/guard-subagent-isolation.py"
+}
+
+# Subagent tool calls carry agent_id: they must never be counted or blocked
+for i in $(seq 1 12); do
+  SUB_OUT="$(guard Read ',"agent_id":"agent-test"')"
+  [ -z "$SUB_OUT" ] || break
+done
+assert_ok "Subagent calls (agent_id) are never counted or blocked" test -z "$SUB_OUT"
+
 for i in $(seq 1 9); do
-  OUT="$(printf '{"session_id":"%s","tool_name":"Read"}' "$TEST_SID" | "$REPO_ROOT/.claude/hooks/guard-subagent-isolation.py")"
+  OUT="$(guard Read)"
 done
 assert_ok "Calls 1-9 allowed silently" test -z "$OUT"
 
-OUT_10="$(printf '{"session_id":"%s","tool_name":"Grep"}' "$TEST_SID" | "$REPO_ROOT/.claude/hooks/guard-subagent-isolation.py")"
+OUT_10="$(guard Grep)"
 assert_ok "Call 10 triggers permissionDecision=deny" jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$OUT_10"
 
-printf '{"session_id":"%s","tool_name":"Task"}' "$TEST_SID" | "$REPO_ROOT/.claude/hooks/guard-subagent-isolation.py" >/dev/null
-OUT_AFTER_RESET="$(printf '{"session_id":"%s","tool_name":"Read"}' "$TEST_SID" | "$REPO_ROOT/.claude/hooks/guard-subagent-isolation.py")"
-assert_ok "Task delegation resets exploration counter" test -z "$OUT_AFTER_RESET"
+for i in $(seq 1 9); do
+  OUT="$(guard Read)"
+done
+OUT_20="$(guard Glob)"
+assert_ok "Guardrail re-arms and fires again on call 20" jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$OUT_20"
+
+for i in $(seq 1 9); do
+  guard Read >/dev/null
+done
+guard Agent >/dev/null
+OUT_AFTER_RESET="$(guard Read)"
+assert_ok "Agent delegation resets exploration counter" test -z "$OUT_AFTER_RESET"
 rm -f "/tmp/agent_context_forge/exploration_${TEST_SID}.json"
 
 COMPACT_OUT="$("$REPO_ROOT/.claude/hooks/pre-compact-handover.sh")"

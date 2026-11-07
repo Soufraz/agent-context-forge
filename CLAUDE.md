@@ -11,7 +11,7 @@
 - **Progressive Disclosure (LSP First):** Always prefer native LSP symbol tools (`goToDefinition`, `findReferences`, `documentSymbol`, `workspaceSymbol`) over reading entire files when exploring types, interfaces, or call sites.
 - **Observation Masking (`rtk`):** When running test suites, builds, or verbose git inspections, prefer `rtk <command>` (when installed) so passing test noise is collapsed and only actionable failures enter working context.
 - **Token-Bomb Avoidance:** Never read lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`), build artifacts (`dist/`, `build/`, `.next/`), or minified bundles into context.
-- **Subagent Context Isolation:** Keep the primary session context flat. If an investigation requires 10+ exploratory `Read`, `Grep`, or `Glob` calls, delegate the exploration to a fresh subagent (`Task` tool) and return only a concise synthesis with exact `file:line` pointers.
+- **Subagent Context Isolation:** Keep the primary session context flat. If an investigation requires 10+ exploratory `Read`, `Grep`, or `Glob` calls, delegate the exploration to a fresh subagent (`Agent` tool) and return only a concise synthesis with exact `file:line` pointers.
 
 ## 3. Repository Structure & On-Demand Pointers
 - `.claude/settings.json` — Hook bindings (`SessionStart`, `PreToolUse`, `PreCompact`), LSP flag, and token-bomb read denials.

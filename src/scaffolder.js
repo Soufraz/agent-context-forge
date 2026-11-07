@@ -235,7 +235,7 @@ export function scaffoldProject(targetDir, options = {}) {
 
   if (subagentIsolation === 'guardrail' || subagentIsolation === 'both') {
     preToolUseList.push({
-      matcher: 'Read|Grep|Glob|Task|Write|Edit',
+      matcher: 'Read|Grep|Glob|Agent|Task|Write|Edit',
       hooks: [
         {
           type: 'command',

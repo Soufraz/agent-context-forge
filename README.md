@@ -42,7 +42,7 @@ The root cause rarely lies in the model weights—it is **unmanaged context entr
 | **1. Prompt Cache Thrashing** | Storing sprint checklists (`- [ ]`), issue IDs (`#123`), or `TODO`s in `CLAUDE.md` invalidates the provider's KV prefix cache on every edit. | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
 | **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Enables native compiler LSP (`ENABLE_LSP_TOOL=1`) for ~50ms symbol jumps + hard `permissions.deny` rules on token-bomb files. |
 | **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook transparently rewrites standalone test/git commands through [`rtk`](https://github.com/rtk-ai/rtk), collapsing passing suites (`✓ 142 passed`) while keeping 100% of failure diffs. |
-| **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls and blocks at `10`, forcing delegation to an isolated subagent (`Task`). |
+| **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls in the primary session and blocks every `10th`, pushing delegation to an isolated subagent (`Agent` tool). |
 | **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that snapshots active git state before compaction. |
 
 ---
@@ -129,8 +129,8 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 
 ### Pillar 4: Subagent Context Isolation
 * **Files:** [`.claude/hooks/guard-subagent-isolation.py`](.claude/hooks/guard-subagent-isolation.py) + [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md)
-* **Mechanism:** Tracks consecutive `Read`, `Grep`, and `Glob` calls per session in `/tmp/agent_context_forge/`.
-* **Threshold:** Calls `1–9` pass silently (`< 5ms`, `0 tokens`). On call `10`, returns `permissionDecision: "deny"` instructing the primary agent to dispatch a fresh research subagent (`Task` tool) and return only a concise synthesis. Resets automatically when `Task`, `Write`, or `Edit` is called.
+* **Mechanism:** Tracks consecutive `Read`, `Grep`, and `Glob` calls per session in `/tmp/agent_context_forge/`. Calls made inside subagents (hook input carries an `agent_id`) are not counted.
+* **Threshold:** Calls `1–9` pass silently (`< 5ms`, `0 tokens`). On call `10`, returns `permissionDecision: "deny"` instructing the primary agent to dispatch a fresh research subagent (`Agent` tool) and return only a concise synthesis, then re-arms for the next `10`. Resets when `Agent`, `Write`, or `Edit` is called.
 
 ### Pillar 5: Episodic Memory & Lossy Compaction Handover
 * **Files:** [`.claude/hooks/pre-compact-handover.sh`](.claude/hooks/pre-compact-handover.sh) + [`scripts/agent-gates/check-memory.sh`](scripts/agent-gates/check-memory.sh)

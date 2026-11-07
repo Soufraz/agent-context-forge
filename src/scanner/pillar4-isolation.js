@@ -139,7 +139,7 @@ export function auditPillar4(projectDir) {
     let mentionsSubagents = false;
     if (fs.existsSync(claudeMdPath)) {
       const claudeContent = fs.readFileSync(claudeMdPath, 'utf-8');
-      if (/subagent|Task tool|Goldfish/i.test(claudeContent)) {
+      if (/subagent|Agent tool|Task tool|Goldfish/i.test(claudeContent)) {
         mentionsSubagents = true;
       }
     }

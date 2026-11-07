@@ -171,6 +171,50 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
+  test("scaffoldProject: keeps the project's own AGENTS.md loading in Claude Code", () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_agentsmd_'));
+    fs.writeFileSync(path.join(tmpProject, 'AGENTS.md'), '# Our team rules\n');
+
+    scaffoldProject(tmpProject, {});
+    // Claude Code reads only CLAUDE.md when both exist, so ours must import theirs
+    const claudeMd = fs.readFileSync(path.join(tmpProject, 'CLAUDE.md'), 'utf-8');
+    assert.ok(claudeMd.startsWith('@AGENTS.md\n'));
+    assert.equal(fs.readFileSync(path.join(tmpProject, 'AGENTS.md'), 'utf-8'), '# Our team rules\n');
+
+    // A re-install keeps the import
+    scaffoldProject(tmpProject, {});
+    assert.ok(fs.readFileSync(path.join(tmpProject, 'CLAUDE.md'), 'utf-8').startsWith('@AGENTS.md\n'));
+
+    // A fresh project gets both files from the harness and no import
+    const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_fresh_'));
+    scaffoldProject(fresh, {});
+    assert.ok(!fs.readFileSync(path.join(fresh, 'CLAUDE.md'), 'utf-8').startsWith('@AGENTS.md'));
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+    fs.rmSync(fresh, { recursive: true, force: true });
+  });
+
+  test('auditPillar1: measures what Claude Code loads, following @imports', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_imports_'));
+    const longRules = Array.from({ length: 300 }, (_, i) => `- Rule ${i}`).join('\n');
+    fs.writeFileSync(path.join(tmpProject, 'AGENTS.md'), `# Rules\n${longRules}\n- [ ] ship it\n`);
+    fs.writeFileSync(path.join(tmpProject, 'CLAUDE.md'), '@AGENTS.md\n\nSee `@not-an-import.md`.\n');
+
+    const report = auditProject(tmpProject);
+    assert.ok(report.measurements.tier1.lines > 300, 'imported AGENTS.md is counted');
+    assert.equal(report.measurements.tier1.file, 'CLAUDE.md + AGENTS.md');
+    const p1 = report.pillars.pillar1.findings;
+    assert.ok(p1.some((f) => f.title.startsWith('Tier-1 Context is Bloated')));
+    assert.ok(p1.some((f) => f.details?.some((d) => d.file === 'AGENTS.md' && d.reason.startsWith('Task checklist'))));
+    assert.ok(!p1.some((f) => f.title === 'AGENTS.md Is Not Loaded by Claude Code'));
+
+    // Without the import, AGENTS.md is ignored by Claude Code and the scanner says so
+    fs.writeFileSync(path.join(tmpProject, 'CLAUDE.md'), '# Rules\n');
+    assert.ok(auditProject(tmpProject).pillars.pillar1.findings.some((f) => f.title === 'AGENTS.md Is Not Loaded by Claude Code'));
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
   test('auditPillar4: orchestrator scoping follows the real `tools` frontmatter, not comments', () => {
     const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_pillar4_'));
     scaffoldProject(tmpProject, { subagentIsolation: 'both' });

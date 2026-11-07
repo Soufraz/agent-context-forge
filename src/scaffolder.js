@@ -343,6 +343,13 @@ export function scaffoldProject(targetDir, options = {}) {
   }
 
   // 6. Context Documents (Custom or Starter)
+  // Claude Code reads only CLAUDE.md when both files exist, so a CLAUDE.md next to the user's
+  // own AGENTS.md (not one this harness wrote) must import it, or those instructions stop loading.
+  const agentsMdPath = path.join(targetDir, 'AGENTS.md');
+  const userOwnsAgentsMd =
+    fs.existsSync(agentsMdPath) && previousHashes['AGENTS.md'] !== sha256(fs.readFileSync(agentsMdPath));
+  const withAgentsImport = (content) => (userOwnsAgentsMd ? `@AGENTS.md\n\n${content}` : content);
+
   if (projectContext) {
     const generated = generateProjectContext({
       ...projectContext,
@@ -351,7 +358,7 @@ export function scaffoldProject(targetDir, options = {}) {
       masking,
       episodicMemory
     });
-    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), generated.claudeMdContent, false, 'user');
+    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), withAgentsImport(generated.claudeMdContent), false, 'user');
     writeFileWithPerms(path.join(targetDir, 'AGENTS.md'), generated.agentsMdContent, false, 'user');
     writeFileWithPerms(
       path.join(targetDir, '.agents', 'rules', 'project-architecture.md'),
@@ -360,7 +367,12 @@ export function scaffoldProject(targetDir, options = {}) {
       'user'
     );
   } else {
-    copyFileWithPerms(path.join(PACKAGE_ROOT, 'CLAUDE.md'), path.join(targetDir, 'CLAUDE.md'), false, 'user');
+    writeFileWithPerms(
+      path.join(targetDir, 'CLAUDE.md'),
+      withAgentsImport(fs.readFileSync(path.join(PACKAGE_ROOT, 'CLAUDE.md'), 'utf-8')),
+      false,
+      'user'
+    );
     copyFileWithPerms(path.join(PACKAGE_ROOT, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'), false, 'user');
     const rulesGitKeep = path.join(PACKAGE_ROOT, '.agents', 'rules', '.gitkeep');
     if (fs.existsSync(rulesGitKeep)) {

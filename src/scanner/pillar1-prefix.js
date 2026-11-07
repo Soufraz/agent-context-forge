@@ -2,6 +2,34 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findHook, hookCommands, loadSettingsLayers, projectScriptStatus } from './settings.js';
 
+// Claude Code follows `@path` imports in memory files up to this many hops
+const MAX_IMPORT_DEPTH = 5;
+
+/**
+ * Collects a memory file and every file it imports with `@path`, the way Claude Code loads
+ * them into context. Imports inside code spans and fenced code blocks are ignored.
+ *
+ * @returns {{file: string, content: string}[]} Absolute paths and contents, in load order
+ */
+export function loadWithImports(file, depth = 0, seen = new Set()) {
+  const resolved = fs.realpathSync(file);
+  if (seen.has(resolved)) return [];
+  seen.add(resolved);
+
+  const content = fs.readFileSync(file, 'utf-8');
+  const parts = [{ file, content }];
+  if (depth >= MAX_IMPORT_DEPTH) return parts;
+
+  const prose = content.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
+  for (const match of prose.matchAll(/(?:^|\s)@([^\s@]+)/g)) {
+    const target = path.resolve(path.dirname(file), match[1]);
+    if (fs.existsSync(target) && fs.statSync(target).isFile()) {
+      parts.push(...loadWithImports(target, depth + 1, seen));
+    }
+  }
+  return parts;
+}
+
 /**
  * Audits Pillar 1: Prefix Stability
  * Max score: 30 points
@@ -33,56 +61,74 @@ export function auditPillar1(projectDir) {
     return { score: 0, maxScore, findings, stats: null };
   }
 
-  // 2. Line count & compactness check (8 pts)
+  // 2. Line count & compactness check (8 pts). Claude Code reads CLAUDE.md when it exists
+  //    (AGENTS.md otherwise), plus everything it imports.
   const targetFile = hasClaudeMd ? claudeMdPath : agentsMdPath;
-  const content = fs.readFileSync(targetFile, 'utf-8');
-  const lines = content.split('\n');
-  const lineCount = lines.length;
+  const parts = loadWithImports(targetFile);
+  const content = parts.map((part) => part.content).join('\n');
+  const lineCount = parts.reduce((sum, part) => sum + part.content.split('\n').length, 0);
   const estimatedTokens = Math.round(content.length / 4);
+  const loadedNames = parts.map((part) => path.relative(projectDir, part.file)).join(' + ');
+
+  // With both files present, Claude Code reads only CLAUDE.md unless it imports AGENTS.md
+  if (hasClaudeMd && hasAgentsMd) {
+    const agentsLoaded = parts.some((part) => fs.realpathSync(part.file) === fs.realpathSync(agentsMdPath));
+    if (!agentsLoaded) {
+      findings.push({
+        status: 'warn',
+        title: 'AGENTS.md Is Not Loaded by Claude Code',
+        description:
+          'When CLAUDE.md exists, Claude Code reads it instead of AGENTS.md. Add `@AGENTS.md` to CLAUDE.md if its instructions should apply.'
+      });
+    }
+  }
 
   if (lineCount <= 150) {
     score += 8;
     findings.push({
       status: 'pass',
-      title: `Tier-1 Context is Compact (${lineCount} lines / ~${estimatedTokens} tokens)`,
+      title: `Tier-1 Context is Compact (${lineCount} lines / ~${estimatedTokens} tokens in ${loadedNames})`,
       description: 'File is well under the 150-line threshold. It is re-sent on every turn, so every line costs tokens and attention.'
     });
   } else if (lineCount <= 250) {
     score += 4;
     findings.push({
       status: 'warn',
-      title: `Tier-1 Context is Moderate (${lineCount} lines / ~${estimatedTokens} tokens)`,
+      title: `Tier-1 Context is Moderate (${lineCount} lines / ~${estimatedTokens} tokens in ${loadedNames})`,
       description: 'Approaching the recommended 150-line ceiling. Consider offloading domain rules to Tier-2 on-demand files.'
     });
   } else {
     findings.push({
       status: 'fail',
-      title: `Tier-1 Context is Bloated (${lineCount} lines / ~${estimatedTokens} tokens)`,
+      title: `Tier-1 Context is Bloated (${lineCount} lines / ~${estimatedTokens} tokens in ${loadedNames})`,
       description: 'Exceeds 250 lines. A large root prefix is re-sent on every turn, costing tokens and diluting the instructions that matter.'
     });
   }
 
   // 3. Volatile markers check (8 pts)
   const volatileViolations = [];
-  lines.forEach((line, index) => {
-    const lineNum = index + 1;
-    // Task lists: - [ ] or - [x]
-    if (/^\s*-\s*\[[ xX]\]/.test(line)) {
-      volatileViolations.push({ lineNum, reason: 'Task checklist item (- [ ])', lineText: line.trim() });
-    }
-    // Issue tracking numbers: e.g. #123, Fixes #45
-    else if (/#\d{1,6}\b/.test(line) && !line.includes('C#') && !line.includes('F#')) {
-      volatileViolations.push({ lineNum, reason: 'Issue reference (#123)', lineText: line.trim() });
-    }
-    // Dates: YYYY-MM-DD
-    else if (/\b\d{4}-\d{2}-\d{2}\b/.test(line) && !line.toLowerCase().includes('copyright')) {
-      volatileViolations.push({ lineNum, reason: 'Calendar date (invalidates cache over time)', lineText: line.trim() });
-    }
-    // TODO / FIXME markers
-    else if (/\b(TODO|FIXME|WIP):/i.test(line)) {
-      volatileViolations.push({ lineNum, reason: 'Temporary TODO/FIXME marker', lineText: line.trim() });
-    }
-  });
+  for (const part of parts) {
+    const file = path.relative(projectDir, part.file);
+    part.content.split('\n').forEach((line, index) => {
+      const lineNum = index + 1;
+      // Task lists: - [ ] or - [x]
+      if (/^\s*-\s*\[[ xX]\]/.test(line)) {
+        volatileViolations.push({ file, lineNum, reason: 'Task checklist item (- [ ])', lineText: line.trim() });
+      }
+      // Issue tracking numbers: e.g. #123, Fixes #45
+      else if (/#\d{1,6}\b/.test(line) && !line.includes('C#') && !line.includes('F#')) {
+        volatileViolations.push({ file, lineNum, reason: 'Issue reference (#123)', lineText: line.trim() });
+      }
+      // Dates: YYYY-MM-DD
+      else if (/\b\d{4}-\d{2}-\d{2}\b/.test(line) && !line.toLowerCase().includes('copyright')) {
+        volatileViolations.push({ file, lineNum, reason: 'Calendar date (invalidates cache over time)', lineText: line.trim() });
+      }
+      // TODO / FIXME markers
+      else if (/\b(TODO|FIXME|WIP):/i.test(line)) {
+        volatileViolations.push({ file, lineNum, reason: 'Temporary TODO/FIXME marker', lineText: line.trim() });
+      }
+    });
+  }
 
   if (volatileViolations.length === 0) {
     score += 8;
@@ -94,7 +140,7 @@ export function auditPillar1(projectDir) {
   } else {
     findings.push({
       status: 'fail',
-      title: `${volatileViolations.length} Volatile Marker(s) Detected in ${path.basename(targetFile)}`,
+      title: `${volatileViolations.length} Volatile Marker(s) Detected in ${loadedNames}`,
       description: 'Task state goes stale, crowds out durable rules, and each edit costs a prompt-cache miss at the next session start.',
       details: volatileViolations.slice(0, 8)
     });
@@ -170,6 +216,6 @@ export function auditPillar1(projectDir) {
     });
   }
 
-  const stats = { file: path.basename(targetFile), lines: lineCount, tokens: estimatedTokens };
+  const stats = { file: loadedNames, lines: lineCount, tokens: estimatedTokens };
   return { score, maxScore, findings, stats };
 }

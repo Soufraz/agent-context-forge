@@ -4,6 +4,8 @@
 # Triggered before `/compact` or auto-compaction runs. Captures active Git
 # working state and outputs structural preservation instructions so the
 # compactor retains exact file paths, active diffs, and architectural rules.
+# Claude Code uses a PreCompact hook's stdout as instructions for the compaction
+# summary, so everything worth keeping goes to stdout.
 
 set -euo pipefail
 
@@ -14,16 +16,6 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
 MODIFIED="$(git status -s 2>/dev/null | head -n 20 || true)"
 DIFF_STAT="$(git diff --stat 2>/dev/null | tail -n 10 || true)"
 
-mkdir -p /tmp/agent_context_forge
-cat <<EOF > /tmp/agent_context_forge/pre_compact_snapshot.txt
-Branch: $BRANCH
-Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-Modified Files:
-${MODIFIED:-  (working tree clean)}
-Diff Stat:
-${DIFF_STAT:-  (no unstaged diff)}
-EOF
-
 cat <<EOF
 [Context Compaction Handover Guardrail]
 When summarizing this session, DO NOT compress away:
@@ -33,6 +25,8 @@ When summarizing this session, DO NOT compress away:
 Current Branch: $BRANCH
 Active Working Tree State:
 ${MODIFIED:-  (clean)}
+Diff Stat:
+${DIFF_STAT:-  (no unstaged diff)}
 EOF
 
 exit 0

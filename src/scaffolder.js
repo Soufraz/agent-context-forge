@@ -262,7 +262,7 @@ export function scaffoldProject(targetDir, options = {}) {
           {
             type: 'command',
             command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-handover.sh"',
-            statusMessage: 'Snapshotting active state before context compaction...'
+            statusMessage: 'Adding handover notes to the compaction summary...'
           }
         ]
       }

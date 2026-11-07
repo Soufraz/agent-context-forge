@@ -43,7 +43,7 @@ The root cause rarely lies in the model weights—it is **unmanaged context entr
 | **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Guides you to Claude Code's code intelligence plugin for your language (compiler-backed symbol jumps) + hard `permissions.deny` rules on token-bomb files. |
 | **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook transparently rewrites standalone test/git commands through [`rtk`](https://github.com/rtk-ai/rtk), collapsing passing suites (`✓ 142 passed`) while keeping 100% of failure diffs. |
 | **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls in the primary session and blocks every `10th`, pushing delegation to an isolated subagent (`Agent` tool). |
-| **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that snapshots active git state before compaction. |
+| **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that feeds active git state and preservation rules into the compaction summary. |
 
 ---
 
@@ -137,7 +137,7 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 
 ### Pillar 5: Episodic Memory & Lossy Compaction Handover
 * **Files:** [`.claude/hooks/pre-compact-handover.sh`](.claude/hooks/pre-compact-handover.sh) + [`scripts/agent-gates/check-memory.sh`](scripts/agent-gates/check-memory.sh)
-* **Mechanism:** Verifies Claude Code's native two-tier Auto-Memory (`~/.claude/projects/<slug>/memory/MEMORY.md`) on `SessionStart`, and triggers on `PreCompact` to snapshot `git status -s` + `git diff --stat` and inject preservation rules before context summarization occurs.
+* **Mechanism:** Verifies Claude Code's native two-tier Auto-Memory (`~/.claude/projects/<slug>/memory/MEMORY.md`) on `SessionStart`, and triggers on `PreCompact` to print `git status -s` + `git diff --stat` and preservation rules. Claude Code uses a PreCompact hook's stdout as instructions for the compaction summary.
 
 ---
 

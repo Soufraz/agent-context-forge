@@ -91,7 +91,7 @@ export function auditPillar5(projectDir) {
     findings.push({
       status: 'pass',
       title: 'Lossy Compaction Protection Active (PreCompact Hook)',
-      description: 'Snapshots active Git diffs and instructs the summarizer to preserve exact file:line pointers.'
+      description: 'Gives the compaction summarizer the active git state and instructions to preserve exact file:line pointers.'
     });
   } else {
     findings.push({

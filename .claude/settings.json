@@ -21,6 +21,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/rewrite-rtk.sh\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit-prefix-stability.sh\"",
             "timeout": 60,
             "statusMessage": "Validating context prefix stability before commit..."

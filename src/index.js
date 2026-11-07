@@ -7,6 +7,7 @@ import { scaffoldProject } from './scaffolder.js';
 import { auditProject } from './scanner/index.js';
 import { generateHtmlReport } from './reporter/html-template.js';
 import { openInBrowser } from './reporter/open-browser.js';
+import { offerToolInstallations } from './installer-helper.js';
 import { execSync } from 'node:child_process';
 
 export async function runCli() {
@@ -18,24 +19,29 @@ export async function runCli() {
     )}`
   );
 
+  const asciiChart = [
+    pc.cyan('┌────────────────────────────────────────────────────────────────────────┐'),
+    pc.cyan('│ ') + pc.bold(pc.white('LAYER 2: Workflow & Planning Methodology')) + pc.cyan('                              │'),
+    pc.cyan('│ ') + pc.white('Superpowers SDD • GetShitDone (GSD) • ECC • Elephant-Goldfish • TDD  ') + pc.cyan('│'),
+    pc.cyan('│ ') + pc.gray('↳ How you brainstorm, decompose features, and coordinate tasks.       ') + pc.cyan('│'),
+    pc.cyan('├────────────────────────────────────────────────────────────────────────┤'),
+    pc.cyan('│ ') + pc.green('▲ ▲ ▲ ▲ ▲  ') + pc.bold(pc.green('LAYER 1: The Foundation Harness (agent-context-forge)')) + pc.cyan('       │'),
+    pc.cyan('│ ') + pc.white('The rails: Prefix Cache Stability • LSP Navigation • RTK Masking        ') + pc.cyan('│'),
+    pc.cyan('│ ') + pc.gray('↳ Keeps active context lean, prevents token bloat, freezes the prefix.  ') + pc.cyan('│'),
+    pc.cyan('└────────────────────────────────────────────────────────────────────────┘')
+  ].join('\n');
+
   p.note(
-    `${pc.bold('💡 The Mental Model:')} ${pc.italic('Active Context Window = RAM')} ${pc.dim(
+    `${pc.bold('💡 The Mental Model:')} ${pc.green('Active Context Window = RAM')} ${pc.white(
       '(fast & lean)'
-    )} | ${pc.italic('Repository & Memory = Disk')} ${pc.dim('(queried on demand)')}\n\n` +
-      `${pc.bold(pc.cyan('LAYER 2: Workflow & Planning Methodology'))} ${pc.dim(
-        '(Superpowers, GSD, ECC, EGM, TDD)'
-      )}\n` +
-      `  ${pc.dim('→ How you brainstorm, break down tasks, and write code.')}\n\n` +
-      `${pc.bold(pc.magenta('LAYER 1: The Context Engineering Harness'))} ${pc.dim(
-        '(agent-context-forge)'
-      )}\n` +
-      `  ${pc.dim('→ The invisible rails, token filters, LSP bridges, and prompt cache gates.')}\n\n` +
+    )} | ${pc.cyan('Repository & Memory = Disk')} ${pc.white('(queried on demand)')}\n\n` +
+      `${asciiChart}\n\n` +
       `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
-      `  ${pc.yellow('1. Prefix Stability')}       ${pc.dim('—')} Freeze Tier-1 root rules (<150 lines) for >80% cache hits.\n` +
-      `  ${pc.yellow('2. Progressive Disclosure')} ${pc.dim('—')} Query compiler symbols (LSP) instead of reading 400-line files.\n` +
-      `  ${pc.yellow('3. Observation Masking')}    ${pc.dim('—')} Compress test/build noise with RTK (~60–90% token savings).\n` +
-      `  ${pc.yellow('4. Context Isolation')}      ${pc.dim('—')} Delegate sprawling searches to subagents; keep chat flat.\n` +
-      `  ${pc.yellow('5. Episodic Memory')}        ${pc.dim('—')} Retain cross-session lessons without dirtying repo prefix.`,
+      `  ${pc.yellow('1. Prefix Stability')}       → Freeze Tier-1 root rules (<150 lines) for >80% prompt cache hits.\n` +
+      `  ${pc.yellow('2. Progressive Disclosure')} → Query compiler symbols (LSP) instead of reading 400-line files.\n` +
+      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK (~60–90% token savings).\n` +
+      `  ${pc.yellow('4. Context Isolation')}      → Delegate sprawling searches to subagents; keep chat flat.\n` +
+      `  ${pc.yellow('5. Episodic Memory')}        → Retain cross-session lessons in Auto-Memory outside repo files.`,
     '📖 Welcome & Core Concepts'
   );
 
@@ -192,6 +198,15 @@ async function runScanAndReport(projectDir) {
   const opened = await openInBrowser(reportPath);
   if (!opened) {
     p.log.info(`You can view the dashboard by opening:\n${pc.underline(reportPath)}`);
+  }
+
+  // Interactively offer to install missing tools detected in scan
+  if (
+    report.pillars.pillar2.score < report.pillars.pillar2.maxScore ||
+    report.pillars.pillar3.score < report.pillars.pillar3.maxScore
+  ) {
+    p.log.step('Missing environment tools detected in scan:');
+    await offerToolInstallations(projectDir);
   }
 
   p.outro(pc.green('Context audit finished! Check your browser for details.'));
@@ -403,6 +418,9 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       console.log(pc.dim(doctorOutput.trim()));
     } catch {}
   }
+
+  // Interactively offer to install missing tools (rtk, language server)
+  await offerToolInstallations(targetDir);
 
   p.note(
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +

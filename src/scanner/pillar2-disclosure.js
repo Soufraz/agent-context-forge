@@ -9,7 +9,7 @@ import {
   pluginInstallCommand,
   tsserverAvailable
 } from '../lsp-plugins.js';
-import { loadSettingsLayers } from './settings.js';
+import { findHook, loadSettingsLayers } from './settings.js';
 
 /**
  * Audits Pillar 2: Progressive Disclosure via Language Server Protocol & Token Bomb Protection
@@ -95,31 +95,45 @@ export function auditPillar2(projectDir) {
     }
   }
 
-  // 3. permissions.deny Token-Bomb configuration (4 pts)
-  const deniedList = settings?.permissions?.deny || [];
-  const hasDenyRules = Array.isArray(deniedList) && deniedList.length > 0;
-  const protectsLockfiles = deniedList.some((rule) => rule.includes('lock'));
+  // 3. Whole-file read guard for lockfiles and bundles (4 pts). permissions.deny Read rules
+  //    also stop Grep and `grep` on those files, so they get partial credit and a warning.
+  const deniedList = Array.isArray(settings?.permissions?.deny) ? settings.permissions.deny : [];
+  const denyRulesCoverLockfiles = deniedList.some((rule) => /lock/.test(rule));
+  const readGuard = findHook(projectDir, layers, 'PreToolUse', /guard-whole-file-reads\.sh/);
+  const protectsLockfiles = readGuard.working || denyRulesCoverLockfiles;
 
-  if (hasDenyRules && protectsLockfiles) {
+  if (readGuard.working) {
     score += 4;
     findings.push({
       status: 'pass',
-      title: `Token Bomb Denials Active (${deniedList.length} rules)`,
-      description: 'permissions.deny blocks accidental reads of lockfiles, build outputs, and minified bundles.'
+      title: 'Whole-File Reads of Lockfiles and Bundles Are Guarded',
+      description: 'A PreToolUse hook blocks reading lockfiles, minified bundles, and source maps whole, and points to grep. Searches and ranged reads still work.'
+    });
+  } else if (denyRulesCoverLockfiles) {
+    score += 2;
+    findings.push({
+      status: 'warn',
+      title: 'Lockfiles Are Blocked by permissions.deny',
+      description:
+        'Read deny rules also block Grep and `grep` on those files, so agents cannot answer questions like "which version is locked". Prefer a hook that blocks only whole-file reads.'
     });
   } else {
     findings.push({
-      status: 'fail',
-      title: 'No Token Bomb Denials in permissions.deny',
-      description: 'An accidental Read call on a lockfile or build bundle can dump 20,000–100,000 tokens into context RAM.'
+      status: 'warn',
+      title: 'Nothing Guards Whole-File Reads of Lockfiles',
+      description: 'Claude Code refuses to Read files over 256 KB and caps one Read at 25,000 tokens, so the exposure is smaller lockfiles read whole.'
     });
   }
 
-  // 4. Discovery of unprotected token-bomb files in repo (4 pts)
+  // 4. Lockfile exposure in the repo root (4 pts). What one whole-file Read would load: nothing
+  //    for files over 256 KB (Read refuses them), at most 25,000 tokens otherwise (bytes / 4).
+  const READ_MAX_BYTES = 256 * 1024;
+  const READ_MAX_TOKENS = 25000;
   const commonTokenBombs = [
     'package-lock.json',
     'pnpm-lock.yaml',
     'yarn.lock',
+    'bun.lock',
     'Cargo.lock',
     'poetry.lock',
     'uv.lock'
@@ -130,39 +144,37 @@ export function auditPillar2(projectDir) {
     const fullPath = path.join(projectDir, tb);
     if (fs.existsSync(fullPath)) {
       const stats = fs.statSync(fullPath);
-      const sizeKb = Math.round(stats.size / 1024);
-      const estTokens = Math.round(stats.size / 4);
-      foundTokenBombs.push({ file: tb, sizeKb, estTokens });
+      const estTokens = stats.size > READ_MAX_BYTES ? 0 : Math.min(READ_MAX_TOKENS, Math.round(stats.size / 4));
+      foundTokenBombs.push({ file: tb, sizeKb: Math.round(stats.size / 1024), estTokens });
     }
   }
+  const exposed = protectsLockfiles ? [] : foundTokenBombs.filter((f) => f.estTokens > 0);
 
   if (foundTokenBombs.length === 0) {
     score += 4;
     findings.push({
       status: 'pass',
-      title: 'No Raw Lockfiles in Repository Root',
-      description: 'No massive lockfiles found in root to threaten context budget.'
+      title: 'No Lockfiles in Repository Root',
+      description: 'No lockfiles found in the root to threaten the context budget.'
+    });
+  } else if (exposed.length === 0) {
+    score += 4;
+    findings.push({
+      status: 'pass',
+      title: `Lockfiles Can't Be Read Whole: ${foundTokenBombs.map((f) => `${f.file} (${f.sizeKb} KB)`).join(', ')}`,
+      description: protectsLockfiles
+        ? 'Whole-file reads of these lockfiles are blocked.'
+        : 'Each is over 256 KB, which Claude Code refuses to Read whole.'
     });
   } else {
-    // If found, check if they are protected
-    if (protectsLockfiles) {
-      score += 4;
-      findings.push({
-        status: 'pass',
-        title: `Discovered Lockfiles are Protected: ${foundTokenBombs.map((f) => `${f.file} (~${f.estTokens} tokens)`).join(', ')}`,
-        description: 'Lockfiles exist in project but are safely guarded by permissions.deny.'
-      });
-    } else {
-      findings.push({
-        status: 'fail',
-        title: `Unprotected Token Bomb(s) Found in Project: ${foundTokenBombs.map((f) => f.file).join(', ')}`,
-        description: 'These files exist and could be read in full by an agent, causing catastrophic context dilution.',
-        details: foundTokenBombs
-      });
-    }
+    findings.push({
+      status: 'fail',
+      title: `Lockfiles Can Be Read Whole: ${exposed.map((f) => `${f.file} (~${f.estTokens} tokens)`).join(', ')}`,
+      description: 'An agent can load these into context in one Read call.',
+      details: exposed
+    });
   }
 
-  // Tokens a single Read of an unprotected lockfile could load (bytes / 4)
-  const unprotectedTokens = protectsLockfiles ? 0 : foundTokenBombs.reduce((sum, f) => sum + f.estTokens, 0);
+  const unprotectedTokens = exposed.reduce((sum, f) => sum + f.estTokens, 0);
   return { score, maxScore, findings, stats: { unprotectedTokens } };
 }

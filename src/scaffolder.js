@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSddSection, generateProjectContext } from './context-generator.js';
+import { generateProjectContext, generateStarterClaudeMd } from './context-generator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
@@ -15,11 +15,33 @@ export const PROPOSAL_SUFFIX = '.context-forge-new';
 // these scripts are replaced with the current definitions; every other hook is left alone.
 const HARNESS_HOOK_SCRIPTS = [
   'scripts/agent-gates/doctor.sh',
+  'scripts/agent-gates/session-context.sh',
   '.claude/hooks/rewrite-rtk.sh',
+  '.claude/hooks/guard-whole-file-reads.sh',
   '.claude/hooks/pre-commit-prefix-stability.sh',
   '.claude/hooks/guard-subagent-isolation.py',
   '.claude/hooks/pre-compact-handover.sh'
 ];
+
+// Read deny rules that v0.1 of this harness added. They also block Grep and `grep` on those
+// files, which made agents fail lockfile questions, so upgrades remove them; the
+// guard-whole-file-reads hook replaces them.
+const LEGACY_HARNESS_DENY_RULES = new Set([
+  'Read(**/package-lock.json)',
+  'Read(**/pnpm-lock.yaml)',
+  'Read(**/yarn.lock)',
+  'Read(**/Cargo.lock)',
+  'Read(**/poetry.lock)',
+  'Read(**/uv.lock)',
+  'Read(**/node_modules/**)',
+  'Read(**/dist/**)',
+  'Read(**/build/**)',
+  'Read(**/.next/**)',
+  'Read(**/coverage/**)',
+  'Read(**/*.min.js)',
+  'Read(**/*.min.css)',
+  'Read(**/*.map)'
+]);
 
 const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
 
@@ -36,11 +58,23 @@ export function mergeSettings(existing, ours) {
   const merged = { ...existing };
   if (!merged.$schema) merged.$schema = ours.$schema;
 
-  const existingDeny = Array.isArray(existing.permissions?.deny) ? existing.permissions.deny : [];
-  merged.permissions = {
-    ...(existing.permissions || {}),
-    deny: [...new Set([...existingDeny, ...ours.permissions.deny])]
-  };
+  // The user's env values win over ours
+  if (ours.env || existing.env) {
+    merged.env = { ...(ours.env || {}), ...(existing.env || {}) };
+  }
+
+  if (existing.permissions) {
+    merged.permissions = { ...existing.permissions };
+    if (Array.isArray(existing.permissions.deny)) {
+      const deny = existing.permissions.deny.filter((rule) => !LEGACY_HARNESS_DENY_RULES.has(rule));
+      if (deny.length > 0) {
+        merged.permissions.deny = deny;
+      } else {
+        delete merged.permissions.deny;
+      }
+    }
+    if (Object.keys(merged.permissions).length === 0) delete merged.permissions;
+  }
 
   merged.hooks = { ...(existing.hooks || {}) };
   for (const event of new Set([...Object.keys(merged.hooks), ...Object.keys(ours.hooks)])) {
@@ -188,25 +222,11 @@ export function scaffoldProject(targetDir, options = {}) {
   // No settings flag turns on Claude Code's LSP tool: it needs a code intelligence plugin,
   // which the installer offers after scaffolding (see lsp-plugins.js).
 
-  // Always protect against accidental lockfile & build token bombs
-  settings.permissions = {
-    deny: [
-      'Read(**/package-lock.json)',
-      'Read(**/pnpm-lock.yaml)',
-      'Read(**/yarn.lock)',
-      'Read(**/Cargo.lock)',
-      'Read(**/poetry.lock)',
-      'Read(**/uv.lock)',
-      'Read(**/node_modules/**)',
-      'Read(**/dist/**)',
-      'Read(**/build/**)',
-      'Read(**/.next/**)',
-      'Read(**/coverage/**)',
-      'Read(**/*.min.js)',
-      'Read(**/*.min.css)',
-      'Read(**/*.map)'
-    ]
-  };
+  // rtk prints a "no hook installed" notice that only checks global settings; this project
+  // install wires it, so keep the notice out of the agent's command output.
+  if (masking === 'rtk') {
+    settings.env = { RTK_SUPPRESS_HOOK_WARNING: '1' };
+  }
 
   const bashHooks = [];
   if (masking === 'rtk') {
@@ -227,12 +247,25 @@ export function scaffoldProject(targetDir, options = {}) {
     {
       matcher: 'Bash',
       hooks: bashHooks
+    },
+    {
+      // Token-bomb protection: blocks only whole-file reads of lockfiles and bundles, so Grep and
+      // `grep` on them keep working (permissions.deny Read rules would block those too)
+      matcher: 'Read',
+      hooks: [
+        {
+          type: 'command',
+          command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-whole-file-reads.sh"',
+          timeout: 5
+        }
+      ]
     }
   ];
 
   if (subagentIsolation === 'guardrail' || subagentIsolation === 'both') {
     preToolUseList.push({
-      matcher: 'Read|Grep|Glob|Agent|Task|Write|Edit',
+      // Bash too: Claude Code searches with grep/find through Bash by default on macOS and Linux
+      matcher: 'Read|Grep|Glob|Bash|Agent|Task|Write|Edit',
       hooks: [
         {
           type: 'command',
@@ -249,8 +282,8 @@ export function scaffoldProject(targetDir, options = {}) {
         hooks: [
           {
             type: 'command',
-            command: '"$CLAUDE_PROJECT_DIR/scripts/agent-gates/doctor.sh"',
-            statusMessage: 'Checking agent context environment (LSP, RTK & Memory readiness)...'
+            command: '"$CLAUDE_PROJECT_DIR/scripts/agent-gates/session-context.sh"',
+            statusMessage: 'Loading project facts and checking the environment...'
           }
         ]
       }
@@ -281,6 +314,11 @@ export function scaffoldProject(targetDir, options = {}) {
   copyFileWithPerms(
     path.join(hooksDir, 'pre-compact-handover.sh'),
     path.join(targetDir, '.claude', 'hooks', 'pre-compact-handover.sh'),
+    true
+  );
+  copyFileWithPerms(
+    path.join(hooksDir, 'guard-whole-file-reads.sh'),
+    path.join(targetDir, '.claude', 'hooks', 'guard-whole-file-reads.sh'),
     true
   );
 
@@ -318,6 +356,11 @@ export function scaffoldProject(targetDir, options = {}) {
   copyFileWithPerms(
     path.join(scriptsDir, 'doctor.sh'),
     path.join(targetDir, 'scripts', 'agent-gates', 'doctor.sh'),
+    true
+  );
+  copyFileWithPerms(
+    path.join(scriptsDir, 'session-context.sh'),
+    path.join(targetDir, 'scripts', 'agent-gates', 'session-context.sh'),
     true
   );
   copyFileWithPerms(
@@ -367,12 +410,9 @@ export function scaffoldProject(targetDir, options = {}) {
       'user'
     );
   } else {
-    // The starter CLAUDE.md has sections 1-4; the chosen methodology becomes section 5
-    const sddSection = buildSddSection(sdd, 5);
-    const starterClaudeMd = fs.readFileSync(path.join(PACKAGE_ROOT, 'CLAUDE.md'), 'utf-8');
     writeFileWithPerms(
       path.join(targetDir, 'CLAUDE.md'),
-      withAgentsImport(sddSection ? `${starterClaudeMd.trimEnd()}\n${sddSection}\n` : starterClaudeMd),
+      withAgentsImport(generateStarterClaudeMd({ sdd })),
       false,
       'user'
     );

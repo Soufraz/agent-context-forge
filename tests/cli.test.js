@@ -80,8 +80,12 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.ok(fs.existsSync(settingsPath));
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
     assert.equal(settings.env?.ENABLE_LSP_TOOL, undefined, 'no settings flag enables the LSP tool');
-    assert.ok(Array.isArray(settings.permissions.deny));
-    assert.ok(settings.permissions.deny.some((r) => r.includes('lock')));
+    // Lockfiles are guarded by a Read hook, not deny rules (those also block grep on them)
+    assert.equal(settings.permissions, undefined);
+    const readHooks = settings.hooks.PreToolUse.filter((g) => g.matcher === 'Read').flatMap((g) => g.hooks);
+    assert.ok(readHooks.some((h) => h.command.includes('guard-whole-file-reads.sh')));
+    assert.equal(settings.env.RTK_SUPPRESS_HOOK_WARNING, '1');
+    assert.ok(settings.hooks.SessionStart[0].hooks[0].command.includes('session-context.sh'));
     assert.ok(settings.hooks.SessionStart);
     assert.ok(settings.hooks.PreToolUse);
     assert.ok(settings.hooks.PreCompact);
@@ -118,7 +122,9 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.writeFileSync(
       path.join(claudeDir, 'settings.json'),
       JSON.stringify({
-        permissions: { allow: ['Bash(make:*)'], deny: ['Read(./secrets/**)'] },
+        // One user rule, one rule v0.1 of this harness added
+        permissions: { allow: ['Bash(make:*)'], deny: ['Read(./secrets/**)', 'Read(**/pnpm-lock.yaml)'] },
+        env: { RTK_SUPPRESS_HOOK_WARNING: '0', MY_VAR: 'x' },
         hooks: {
           Stop: [{ hooks: [{ type: 'command', command: 'my-stop.sh' }] }],
           PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'my-bash-guard.sh' }] }]
@@ -136,8 +142,8 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     // settings.json is merged, not replaced, and the original is backed up
     const settings = JSON.parse(fs.readFileSync(path.join(claudeDir, 'settings.json'), 'utf-8'));
     assert.deepEqual(settings.permissions.allow, ['Bash(make:*)']);
-    assert.ok(settings.permissions.deny.includes('Read(./secrets/**)'));
-    assert.ok(settings.permissions.deny.some((r) => r.includes('lock')));
+    assert.deepEqual(settings.permissions.deny, ['Read(./secrets/**)'], 'legacy harness deny rules are removed');
+    assert.deepEqual(settings.env, { RTK_SUPPRESS_HOOK_WARNING: '0', MY_VAR: 'x' }, "the user's env values win");
     assert.equal(settings.hooks.Stop[0].hooks[0].command, 'my-stop.sh');
     const preToolCommands = settings.hooks.PreToolUse.flatMap((g) => g.hooks.map((h) => h.command));
     assert.ok(preToolCommands.includes('my-bash-guard.sh'));
@@ -220,8 +226,8 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_sdd_'));
     scaffoldProject(tmpProject, { sdd: 'gsd' });
     const claudeMd = fs.readFileSync(path.join(tmpProject, 'CLAUDE.md'), 'utf-8');
-    assert.ok(claudeMd.includes('## 5. Planning & SDD Methodology: GetShitDone (GSD)'));
-    assert.ok(claudeMd.includes('## 4. Coding & Commit Standards'));
+    assert.ok(claudeMd.includes('# Project Instructions'));
+    assert.ok(claudeMd.includes('## Planning & SDD Methodology: GetShitDone (GSD)'));
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
@@ -327,7 +333,7 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     const lspScore = () => {
       const report = auditPillar2(tmpProject);
       // Leave out the token-bomb checks (8 pts) that don't depend on LSP setup
-      return report.score - (report.findings.some((f) => f.title.startsWith('No Raw Lockfiles')) ? 4 : 0);
+      return report.score - (report.findings.some((f) => f.title.startsWith('No Lockfiles in Repository Root')) ? 4 : 0);
     };
 
     try {

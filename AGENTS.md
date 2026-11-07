@@ -8,8 +8,8 @@
 
 ## 2. Context Hygiene Rules
 1. **Symbol Navigation Over Full-File Reads:** Use LSP symbol queries whenever available before reading full implementation files.
-2. **Compress Noisy Command Output:** Prefix test and build runs with `rtk` (Rust Token Killer) when available to strip passing test output and ANSI noise.
-3. **Isolate Deep Exploration:** Delegate multi-file research trajectories (10+ search/read calls) to isolated subagents and return only a concise summary with `file:line` references.
+2. **Compress Noisy Command Output:** In Claude Code, a PreToolUse hook applies `rtk` (Rust Token Killer) automatically, so don't add it yourself. Agents without that hook should prefix test and build runs with `rtk` when it is installed, to strip passing test output and ANSI noise.
+3. **Isolate Deep Exploration:** Delegate multi-file research trajectories (15+ search/read calls) to isolated subagents and return only a concise summary with `file:line` references.
 4. **Zero Context Drift:** Every file path or script referenced in `CLAUDE.md`, `AGENTS.md`, or `.claude/` must exist in the repository.
 
 ## 3. Key Directories

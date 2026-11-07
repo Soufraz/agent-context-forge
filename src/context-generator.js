@@ -12,31 +12,54 @@
  * The CLAUDE.md section for the chosen SDD / planning methodology, or '' for none.
  *
  * @param {string} sdd Methodology id from the wizard
- * @param {number} number Section number to use in the heading
  */
-export function buildSddSection(sdd, number) {
+export function buildSddSection(sdd) {
   if (sdd === 'superpowers') {
     return `
-## ${number}. Planning & SDD Methodology: Superpowers
+## Planning & SDD Methodology: Superpowers
 - **Subagent-Driven Development:** Follow the [Superpowers SDD](https://github.com/obra/superpowers) red-green-refactor workflow.
 - **Subagent Spawning:** When delegating tasks to subagents, provide explicit spec boundaries and expect <250 words summary with file:line pointers.`;
   } else if (sdd === 'gsd') {
     return `
-## ${number}. Planning & SDD Methodology: GetShitDone (GSD)
+## Planning & SDD Methodology: GetShitDone (GSD)
 - **Spec-Driven Workflow:** Follow [GetShitDone](https://github.com/open-gsd/gsd-core) contract-first task phases (Discuss -> Plan -> Execute -> Verify).
 - **Context Isolation:** Keep primary chat flat; execute plan tasks in isolated subagents.`;
   } else if (sdd === 'ecc') {
     return `
-## ${number}. Planning & SDD Methodology: Everything Claude Code (ECC)
+## Planning & SDD Methodology: Everything Claude Code (ECC)
 - **PDCA Engineering Loop:** Follow [ECC](https://github.com/affaan-m/everything-claude-code) Plan-Test-Implement-Review-Verify cycles.
 - **Workflow Skills:** Leverage specialized sub-agents and modular skills without dirtying the root prefix.`;
   } else if (sdd === 'elephant-goldfish') {
     return `
-## ${number}. Planning & SDD Methodology: Elephant-Goldfish Model (EGM)
+## Planning & SDD Methodology: Elephant-Goldfish Model (EGM)
 - **The Elephant:** Long-horizon architectural memory lives on disk (specifications, ADRs, schemas).
 - **The Goldfish:** Fresh, zero-context reviewers evaluated cold without conversational bias. See [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model).`;
   }
   return '';
+}
+
+// The one navigation rule with evidence behind it: LSP references are more precise than text
+// search when names collide or imports are aliased. Models rarely pick LSP on their own.
+const LSP_REFERENCES_RULE =
+  "- To find who calls a function or where a symbol is used, prefer the `LSP` tool's references lookup when it is available (load it with ToolSearch if it isn't listed): text search conflates same-named symbols and misses aliased imports.";
+const LOCKFILE_RULE = '- Search lockfiles with `grep -n` instead of reading them whole.';
+
+const MAINTAINER_NOTE = `<!--
+Claude Code strips HTML comments like this one before loading the file, so notes here cost no
+tokens. Everything outside comments is sent with every request: keep it short and stable, add
+only rules that change how Claude works in this project (architecture boundaries, commands,
+conventions it can't infer from the code), and leave out task lists, issue numbers, and dates.
+-->`;
+
+/**
+ * The starter CLAUDE.md for projects installed without custom context. Rules that hooks enforce
+ * or that Claude Code handles itself are left out, since every line costs tokens on every turn.
+ */
+export function generateStarterClaudeMd({ sdd = 'none' } = {}) {
+  return [MAINTAINER_NOTE, '# Project Instructions', '', LSP_REFERENCES_RULE, LOCKFILE_RULE, buildSddSection(sdd)]
+    .filter((part) => part !== '')
+    .join('\n')
+    .replace('# Project Instructions\n', '# Project Instructions\n\n') + '\n';
 }
 
 export function generateProjectContext(options = {}) {
@@ -52,48 +75,36 @@ export function generateProjectContext(options = {}) {
   } = options;
 
   // 1. Build SDD Section for CLAUDE.md if requested
-  const sddSection = buildSddSection(sdd, 3);
+  const sddSection = buildSddSection(sdd);
 
-  // 2. Memory instructions
-  const memoryNote =
-    episodicMemory === 'context-mode'
-      ? '- **Context Virtualization:** This project uses [context-mode](https://github.com/mksglu/context-mode) MCP for advanced episodic context tracking.'
-      : '- **Episodic Auto-Memory:** Cross-session lessons are captured automatically in `~/.claude/projects/<slug>/memory/` (verified via `doctor.sh`).';
-
-  // 3. LSP & Masking notes
-  const lspNote =
+  // 2. Notes for the tools the user chose instead of the defaults
+  const toolNotes = [
     lsp === 'native'
-      ? '- **Progressive Disclosure (LSP First):** When the `LSP` tool is available (a code intelligence plugin is installed), query symbols (`goToDefinition`, `documentSymbol`) before reading whole files.'
-      : `- **Progressive Disclosure:** Use ${typeof lsp === 'object' && lsp.custom ? lsp.custom : 'configured code intelligence'} to navigate symbols.`;
-
-  const maskingNote =
+      ? LSP_REFERENCES_RULE
+      : `- Navigate symbols with ${typeof lsp === 'object' && lsp.custom ? lsp.custom : 'the configured code intelligence tool'}.`,
+    LOCKFILE_RULE,
     masking === 'rtk'
-      ? '- **Observation Masking (`rtk`):** Wrap test and build executions with `rtk` (e.g. `rtk npm test`) to collapse passing test stdout.'
-      : `- **Observation Masking:** Filter test stdout using ${typeof masking === 'object' && masking.custom ? masking.custom : 'output filter'}.`;
+      ? ''
+      : `- Filter test and build output through ${typeof masking === 'object' && masking.custom ? masking.custom : 'the configured output filter'}.`,
+    episodicMemory === 'context-mode'
+      ? '- This project uses [context-mode](https://github.com/mksglu/context-mode) MCP for context virtualization.'
+      : ''
+  ].filter(Boolean);
 
-  const claudeMdContent = `# ${projectName} — Context & Architectural Laws (Tier 1)
-
-> **Prefix Stability Rule:** Static root prefix (< 150 lines). Zero volatile state (no checkboxes or issue IDs): it is re-sent on every turn, so every line costs tokens and competes for attention.
-
-## 1. Project Overview & Stack
-- **Project:** ${projectName}
-- **Description:** ${description}
-- **Core Stack:** ${techStack}
-- **Environment Doctor:** \`./scripts/agent-gates/doctor.sh\`
-- **Prefix Stability Gate:** \`./.claude/hooks/pre-commit-prefix-stability.sh\`
-
-## 2. Context Engineering & Tool Discipline
-${lspNote}
-${maskingNote}
-- **Token-Bomb Avoidance:** Never \`Read\` lockfiles (\`pnpm-lock.yaml\`, \`package-lock.json\`, \`Cargo.lock\`) or build bundles (\`dist/\`, \`.next/\`).
-- **Subagent Context Isolation:** Delegate multi-file searches (10+ calls) to subagents (\`Agent\` tool) and return only <250 words synthesis.
-${memoryNote}${sddSection}
-
-## 4. Key References (On-Demand Pointers)
-- Detailed architecture: \`.agents/rules/project-architecture.md\`
-- Claude settings & hooks: \`.claude/settings.json\` & \`.claude/hooks/\`
-- Portable health gates: \`scripts/agent-gates/\`
-`;
+  const claudeMdContent = [
+    MAINTAINER_NOTE,
+    `# ${projectName}`,
+    '',
+    description,
+    '',
+    `- **Stack:** ${techStack}`,
+    ...(customRules ? [`- ${customRules}`] : []),
+    ...toolNotes,
+    '- More architecture and domain rules: `.agents/rules/project-architecture.md`.',
+    sddSection
+  ]
+    .join('\n')
+    .trimEnd() + '\n';
 
   const agentsMdContent = `# ${projectName} — Universal Agent Instructions (AGENTS.md)
 

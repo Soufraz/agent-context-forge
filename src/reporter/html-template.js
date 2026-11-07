@@ -441,7 +441,7 @@ export function generateHtmlReport(report) {
         <div class="stat-value" style="color: ${unprotectedLockfileTokens > 0 ? '#ef4444' : '#10b981'};">
           ${unprotectedLockfileTokens > 0 ? `~${unprotectedLockfileTokens.toLocaleString('en-US')} tokens` : 'None'}
         </div>
-        <span class="stat-sub">What one Read of an unguarded root lockfile could load (bytes &divide; 4)</span>
+        <span class="stat-sub">What one whole-file Read of an unguarded root lockfile could load (Read refuses files over 256 KB and returns at most 25k tokens)</span>
       </div>
     </div>
 

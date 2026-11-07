@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Universal Git Pre-Commit Hook (Pillar 1: Prefix Stability)
+# Enables the same Prefix Stability & Cache Optimization check for standard Git
+# commits outside Claude Code (CLI, VS Code, Cursor, Zed, Aider, OpenCode).
+#
+# Activate in your repository with:
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+# Skip fast if no context files are staged or modified in this commit
+if ! git diff --cached --name-only | grep -qE '^(CLAUDE\.md|AGENTS\.md|\.claude/|\.agents/)'; then
+  exit 0
+fi
+
+if [ -x "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" ]; then
+  "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" </dev/null
+fi

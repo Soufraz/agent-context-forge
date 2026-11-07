@@ -134,6 +134,42 @@ Coding agents shouldn't suffer from amnesia between sessions, but storing past l
 
 ---
 
+## 🧩 Harness vs. Methodology: Pairing with Planning Frameworks
+
+A common question in agentic development is: *Does this replace frameworks like Superpowers SDD, GetShitDone (GSD), or the Elephant-Goldfish model?*
+
+The answer is **no—they complement each other**. They operate at two different layers of the development stack:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  LAYER 2: Workflow & Execution Methodology                             │
+│  (Superpowers SDD, GetShitDone, TDD, Spec-Driven Dev)                 │
+│  "How you brainstorm, decompose features, and coordinate tasks."       │
+├────────────────────────────────────────────────────────────────────────┤
+│  LAYER 1: The Context Engineering Harness                              │
+│  (agent-context-forge)                                                 │
+│  "The rails, token filters, LSP bridges, and cache gates."             │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Recommended Methodologies & How They Fit Better Here
+
+1. **[Superpowers SDD (Subagent-Driven Development)](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers):**
+   * *How it fits:* Superpowers dispatches fresh implementer and reviewer subagents per task. In `agent-context-forge`, those subagents automatically inherit compiler-backed symbol navigation (Pillar 2), compressed test outputs via `rtk` (Pillar 3), and pre-commit prefix verification (Pillar 1)—preventing the subagent fleet from burning unnecessary tokens or dirtying `CLAUDE.md`.
+2. **GetShitDone (GSD) & ECC (Context Compartmentalization):**
+   * *How it fits:* GSD enforces contract-first task boundaries. Paired with `agent-context-forge`, each compartmentalized worker stays lean and reports concise diffs back to the plan ledger without leaking exploratory noise into the parent coordinator.
+3. **The Elephant-Goldfish Model:**
+   * *How it fits:* Long-term knowledge (ADRs, memory topics, git history) stays with the **Elephant** on disk; short-lived, disposable implementers act as the **Goldfish** in context RAM.
+
+### 💡 Use Whatever Methodology Works Best for You
+`agent-context-forge` is strictly **methodology-agnostic**:
+* If you love **Superpowers SDD** or **GSD**, this harness makes them significantly cheaper and faster.
+* If you prefer classic **Test-Driven Development (TDD)**, single-session pair programming, interactive chat, or your own team's custom planning workflow, that is completely fine!
+
+This boilerplate provides the **underlying context and safety harness**; you remain in total control of how you plan and write code.
+
+---
+
 ## 🌐 Universal Agent Portability
 
 This boilerplate is designed to be **agent-agnostic**. While the initial hook is wired for Claude Code, the core quality gates sit in a portable layer ready to plug into any agent platform:

@@ -127,6 +127,8 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 * **File:** [`.claude/hooks/rewrite-rtk.sh`](.claude/hooks/rewrite-rtk.sh) + [`scripts/agent-gates/check-rtk.sh`](scripts/agent-gates/check-rtk.sh)
 * **Mechanism:** Intercepts standalone high-noise commands (`pytest`, `vitest`, `jest`, `cargo test/check/clippy/build`, `pnpm/npm/yarn test`, `go test`, `git status/diff/log/show`) and transparently rewrites the command input to `rtk <cmd>` via Claude Code's `updatedInput` protocol.
 * **Safety:** Automatically skips piped, chained, redirected, or multiline commands (`|`, `&&`, `;`, `>`) so raw stdout pipelines are never broken. If `rtk` is not installed on `PATH`, the hook exits `0` in `< 1ms`.
+* **No auto-approval:** The rewrite never approves the command. Commands like `npm test` run arbitrary project code, so your permission rules and prompts apply to the rewritten `rtk <cmd>`. Add allow rules such as `Bash(rtk npm test)` if you want them to run without a prompt.
+* **rtk's own hook:** rtk ships a Claude Code hook of its own (`rtk init -g`). When it is configured, this hook stands down so commands are not rewritten twice. Install rtk with `brew install rtk` (or see [its install guide](https://github.com/rtk-ai/rtk#installation)), not `cargo install`: a different crate named `rtk` exists on crates.io.
 
 ### Pillar 4: Subagent Context Isolation
 * **Files:** [`.claude/hooks/guard-subagent-isolation.py`](.claude/hooks/guard-subagent-isolation.py) + [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md)

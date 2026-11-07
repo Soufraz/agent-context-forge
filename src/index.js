@@ -39,7 +39,7 @@ export async function runCli() {
       `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
       `  ${pc.yellow('1. Prefix Stability')}       → Freeze Tier-1 root rules (<150 lines) for >80% prompt cache hits.\n` +
       `  ${pc.yellow('2. Progressive Disclosure')} → Query compiler symbols (LSP) instead of reading 400-line files.\n` +
-      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK (~60–90% token savings).\n` +
+      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK.\n` +
       `  ${pc.yellow('4. Context Isolation')}      → Delegate sprawling searches to subagents; keep chat flat.\n` +
       `  ${pc.yellow('5. Episodic Memory')}        → Retain cross-session lessons in Auto-Memory outside repo files.`,
     '📖 Welcome & Core Concepts'
@@ -253,7 +253,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'rtk',
         label: 'RTK — Rust Token Killer (Default, recommended)',
-        hint: 'Collapses passing tests, keeps failure diffs (~60-90% savings)'
+        hint: 'Collapses passing tests, keeps failure diffs'
       },
       {
         value: 'custom',

@@ -3,8 +3,13 @@
 #
 # When `rtk` (Rust Token Killer) is installed on PATH, automatically prefixes
 # noisy standalone test, build, and git inspection commands with `rtk` via
-# Claude Code's `updatedInput` protocol (~60-90% token savings on test runs).
+# Claude Code's `updatedInput` protocol.
 # If `rtk` is not installed, exits 0 immediately without modifying the command.
+#
+# The rewrite never approves the command: Claude Code's normal permission rules and
+# prompts apply to the rewritten `rtk <cmd>`, because commands such as `npm test` run
+# arbitrary project code. If rtk's own Claude Code hook (`rtk init -g`) is configured,
+# this hook stands down so commands are not rewritten twice.
 
 set -euo pipefail
 
@@ -15,6 +20,14 @@ fi
 
 PAYLOAD="$(cat)"
 if [ -z "$PAYLOAD" ]; then
+  exit 0
+fi
+
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+if grep -qsE 'rtk hook claude|rtk-rewrite\.sh' \
+  "$HOME/.claude/settings.json" \
+  "$PROJECT_ROOT/.claude/settings.json" \
+  "$PROJECT_ROOT/.claude/settings.local.json"; then
   exit 0
 fi
 
@@ -44,7 +57,6 @@ if printf '%s' "$COMMAND" | grep -qE '^[[:space:]]*(pytest|vitest|jest|cargo[[:s
   jq -n --arg cmd "$UPDATED_CMD" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      permissionDecision: "allow",
       updatedInput: {
         command: $cmd
       }

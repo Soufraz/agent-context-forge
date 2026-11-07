@@ -26,33 +26,34 @@ export async function offerToolInstallations(targetDir) {
   const isPython = dirInfo.projectTypes.includes('Python');
 
   const hasRtk = isCommandAvailable('rtk');
-  const hasCargo = isCommandAvailable('cargo');
+  const hasBrew = isCommandAvailable('brew');
   const hasNpm = isCommandAvailable('npm');
 
-  // 1. Offer to install RTK if missing
+  // 1. Offer to install RTK if missing. Never via cargo: a different crate named "rtk"
+  //    exists on crates.io.
   if (!hasRtk) {
-    if (hasCargo) {
+    if (hasBrew) {
       const installRtk = await p.confirm({
         message:
-          'Rust Token Killer (rtk) is not installed. Would you like us to install it now via Cargo? (Runs: cargo install rtk-ai)',
+          'Rust Token Killer (rtk) is not installed. Would you like us to install it now via Homebrew? (Runs: brew install rtk)',
         initialValue: true
       });
 
       if (!p.isCancel(installRtk) && installRtk) {
         const spinner = p.spinner();
-        spinner.start('Compiling and installing rtk via `cargo install rtk-ai`...');
+        spinner.start('Installing rtk via `brew install rtk`...');
         try {
-          execSync('cargo install rtk-ai', { stdio: 'ignore' });
+          execSync('brew install rtk', { stdio: 'ignore' });
           spinner.stop('✓ rtk installed successfully and ready on PATH!');
         } catch (err) {
           spinner.stop('⚠️ Could not automatically install rtk.');
-          p.log.warn('You can install it manually whenever you want:\n  cargo install rtk-ai');
+          p.log.warn('You can install it manually whenever you want:\n  brew install rtk');
         }
       }
     } else {
       p.log.info(
-        `${pc.yellow('Notice:')} rtk (Rust Token Killer) is not installed. Cargo was not found on PATH.\n` +
-          `To enable smart test output compression later, install Rust and run: ${pc.cyan('cargo install rtk-ai')}`
+        `${pc.yellow('Notice:')} rtk (Rust Token Killer) is not installed. Homebrew was not found on PATH.\n` +
+          `To enable smart test output compression later, see ${pc.cyan('https://github.com/rtk-ai/rtk#installation')} (winget on Windows, or the install script).`
       );
     }
   }

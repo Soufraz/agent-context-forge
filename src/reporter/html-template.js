@@ -472,7 +472,7 @@ export function generateHtmlReport(report) {
         <strong>npx agent-context-forge</strong><br><br>
         # Install recommended developer environment tools:<br>
         npm install -g @vtsls/language-server<br>
-        cargo install rtk-ai
+        brew install rtk
       </div>
     </div>
 

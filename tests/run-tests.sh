@@ -69,12 +69,25 @@ MOCK_BIN="$(mktemp -d)"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$MOCK_BIN/rtk"
 chmod +x "$MOCK_BIN/rtk"
 
-REWRITE_OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"pytest tests/"}}' | PATH="$MOCK_BIN:$PATH" "$REPO_ROOT/.claude/hooks/rewrite-rtk.sh")"
-assert_ok "Rewrites standalone 'pytest tests/' to 'rtk pytest tests/'" jq -e '.hookSpecificOutput.updatedInput.command == "rtk pytest tests/"' <<<"$REWRITE_OUT"
+RTK_HOME="$(mktemp -d)"
+RTK_PROJECT="$(mktemp -d)"
+rewrite() {
+  printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" |
+    HOME="$RTK_HOME" CLAUDE_PROJECT_DIR="$RTK_PROJECT" PATH="$MOCK_BIN:$PATH" "$REPO_ROOT/.claude/hooks/rewrite-rtk.sh"
+}
 
-PIPE_OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"pytest tests/ | tee out.log"}}' | PATH="$MOCK_BIN:$PATH" "$REPO_ROOT/.claude/hooks/rewrite-rtk.sh")"
+REWRITE_OUT="$(rewrite 'pytest tests/')"
+assert_ok "Rewrites standalone 'pytest tests/' to 'rtk pytest tests/'" jq -e '.hookSpecificOutput.updatedInput.command == "rtk pytest tests/"' <<<"$REWRITE_OUT"
+assert_ok "Rewrite does not auto-approve the command" jq -e '.hookSpecificOutput | has("permissionDecision") | not' <<<"$REWRITE_OUT"
+
+PIPE_OUT="$(rewrite 'pytest tests/ | tee out.log')"
 assert_ok "Skips piped commands ('pytest tests/ | tee out.log')" test -z "$PIPE_OUT"
-rm -rf "$MOCK_BIN"
+
+mkdir -p "$RTK_HOME/.claude"
+printf '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"rtk hook claude"}]}]}}' > "$RTK_HOME/.claude/settings.json"
+NATIVE_OUT="$(rewrite 'pytest tests/')"
+assert_ok "Stands down when rtk's own hook (rtk init -g) is configured" test -z "$NATIVE_OUT"
+rm -rf "$MOCK_BIN" "$RTK_HOME" "$RTK_PROJECT"
 
 # 5. Validate Subagent Isolation Guardrail (Pillar 4) & PreCompact Handover (Pillar 5)
 echo "[5/5] Checking guard-subagent-isolation.py & pre-compact-handover.sh..."

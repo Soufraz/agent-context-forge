@@ -26,13 +26,13 @@ export function auditPillar3(projectDir) {
     findings.push({
       status: 'pass',
       title: 'Rust Token Killer (rtk) Installed on PATH',
-      description: 'rtk is ready to compress test stdout, build outputs, and git inspections (~60-90% token savings).'
+      description: 'rtk is ready to compress test stdout, build outputs, and git inspections.'
     });
   } else {
     findings.push({
       status: 'warn',
       title: 'rtk (Rust Token Killer) Not Installed',
-      description: 'Raw test runs (e.g. pytest, npm test, cargo test) will dump all passing assertions into context RAM. Install via: cargo install rtk-ai'
+      description: 'Raw test runs (e.g. pytest, npm test, cargo test) will dump all passing assertions into context RAM. Install via `brew install rtk` or see https://github.com/rtk-ai/rtk.'
     });
   }
 

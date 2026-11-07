@@ -1,7 +1,7 @@
 # 🛠️ Agent Context Forge
 ### *An open boilerplate and quality harness for sustainable AI-assisted software development*
 
-[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201%20%26%202%20Ready-success)](#roadmap--future-solutions)
+[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201%2C%202%20%26%203%20Ready-success)](#roadmap--future-solutions)
 [![Platform](https://img.shields.io/badge/Portability-Claude%20%7C%20OpenCode%20%7C%20Antigravity%20%7C%20Universal%20Git-blue)](#universal-agent-portability)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -37,7 +37,7 @@ Our guiding principle is simple: **treat the active context window like working 
 │  Pillar 1    │   │  Pillar 2    │   │  Pillar 3    │   │  Pillar 4    │   │  Pillar 5    │
 │    Prefix    │   │ Progressive  │   │ Observation  │   │  Episodic    │   │Deterministic │
 │  Stability   │   │  Disclosure  │   │   Masking    │   │    Memory    │   │ Architecture │
-│   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │   │  [PLANNED]   │   │  [PLANNED]   │
+│   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │   │  [PLANNED]   │
 └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
@@ -45,7 +45,7 @@ Our guiding principle is simple: **treat the active context window like working 
 | :--- | :--- | :--- | :--- |
 | **1. Prefix Stability** | Token Caching & Drift Gate | ✅ **Implemented** | Strict immutability for Tier 1 root context; pre-commit gate blocking volatile state and drift. |
 | **2. Progressive Disclosure** | Language Server Protocol (LSP) | ✅ **Implemented** | `ENABLE_LSP_TOOL=1` + `SessionStart` pre-flight check for compiler-backed symbol navigation. |
-| **3. Observation Masking** | Tool Output Trimming | 🚧 *Planned* | Terminal/test runner proxy that collapses raw stdout into compact failure diffs. |
+| **3. Observation Masking** | Smart Tool Output Compression | ✅ **Implemented** | `rtk` (Rust Token Killer) doctor check + proxying to collapse test/build noise (~60–90% savings). |
 | **4. Episodic Memory** | Cross-Session Learning | 🚧 *Planned* | Background memory ledger capturing debug insights across git worktrees without touching prefix files. |
 | **5. Deterministic Gates** | Architectural Linters | 🚧 *Planned* | AST graph boundary checks replacing fuzzy negative prompt instructions with hard CI rules. |
 
@@ -82,6 +82,20 @@ Instead of reading 400-line files or guessing line numbers via `grep`, coding ag
    - **`LSPGoToDefinition`** & **`LSPFindReferences`**: Resolves symbols across files in ~50ms.
    - **`LSPDocumentSymbols`** & **`LSPWorkspaceSymbols`**: Inspects interface shapes and function signatures without loading implementation bodies (~70% token savings).
 3. **`SessionStart` Pre-Flight Doctor:** A non-blocking startup hook (`scripts/agent-gates/check-lsp.sh`) detects the project's language (TypeScript, Python, Go, Rust) and confirms the language server binary (`@vtsls/language-server`, `pyright`, `gopls`, `rust-analyzer`) is present on `PATH`. If missing, it provides copy-paste install commands right in the agent's startup console.
+
+---
+
+## 🛡️ Pillar 3: Observation Masking via `rtk` (Rust Token Killer)
+
+When testing or compiling code, raw terminal output can dump thousands of passing tests, ANSI color codes, and verbose compiler lines into context RAM—pushing critical instructions out of the LLM's attention window.
+
+### Why Not Rely Only on Native Truncation?
+Standard terminal truncation is "dumb": it chops characters from the middle or end of output without knowing which lines are errors, frequently discarding the exact stack trace or assertion diff the agent needs.
+
+### How It Works in This Boilerplate
+1. **Smart Test Compression:** Wrapping test runs with [`rtk`](https://github.com/rtk-ai/rtk) (e.g. `rtk pnpm test`, `rtk pytest`) collapses passing suites into a single line (`✓ 48 passed`) while preserving 100% of failing assertions and stack traces.
+2. **Environment Doctor Hook:** Integrated into `scripts/agent-gates/doctor.sh` and checked on `SessionStart`. If `rtk` is missing, it alerts the developer with installation commands (`cargo install rtk-ai`).
+3. **Noise Stripping:** Automatically removes non-semantic ANSI escape codes and progress spinners before tool outputs reach the agent.
 
 ---
 
@@ -140,7 +154,7 @@ agent-context-forge/
 
 - [x] **Pillar 1:** Universal Prefix Stability & Pre-Commit Hook (Active)
 - [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol (Active)
-- [ ] **Pillar 3:** Terminal Output Compression & Test Trimming Proxy (`rtk` / `oo`)
+- [x] **Pillar 3:** Smart Observation Masking via `rtk` (Active)
 - [ ] **Pillar 4:** Background Episodic Memory Ledger (`claude-mem` integration with cache-protection)
 - [ ] **Pillar 5:** Deterministic Monorepo / Boundary Linters (`dependency-cruiser` configs)
 - [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.

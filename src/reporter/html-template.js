@@ -13,10 +13,10 @@ export function generateHtmlReport(report) {
     maxScore,
     grade,
     gradeLabel,
-    cacheHitRate,
-    tokenWasteRisk,
+    measurements,
     pillars
   } = report;
+  const { tier1, unprotectedLockfileTokens } = measurements;
 
   const getGradeColor = (g) => {
     switch (g) {
@@ -425,19 +425,23 @@ export function generateHtmlReport(report) {
       </div>
 
       <div class="stat-card">
-        <span class="stat-label">Est. Prompt Cache Hit Rate</span>
+        <span class="stat-label">Tier-1 Root Context</span>
         <div class="stat-value" style="color: #38bdf8;">
-          ${escapeHtml(cacheHitRate)}
+          ${tier1 ? `${tier1.lines} lines` : 'Missing'}
         </div>
-        <span class="stat-sub">Based on Tier-1 prefix stability</span>
+        <span class="stat-sub">${
+          tier1
+            ? `${escapeHtml(tier1.file)} &bull; ~${tier1.tokens.toLocaleString('en-US')} tokens (chars &divide; 4), re-sent every turn`
+            : 'No CLAUDE.md or AGENTS.md found'
+        }</span>
       </div>
 
       <div class="stat-card">
-        <span class="stat-label">Token Waste Risk</span>
-        <div class="stat-value" style="color: ${tokenWasteRisk.includes('Critical') || tokenWasteRisk.includes('High') ? '#ef4444' : '#10b981'};">
-          ${escapeHtml(tokenWasteRisk)}
+        <span class="stat-label">Unprotected Lockfile Exposure</span>
+        <div class="stat-value" style="color: ${unprotectedLockfileTokens > 0 ? '#ef4444' : '#10b981'};">
+          ${unprotectedLockfileTokens > 0 ? `~${unprotectedLockfileTokens.toLocaleString('en-US')} tokens` : 'None'}
         </div>
-        <span class="stat-sub">Lockfile & test stdout exposure</span>
+        <span class="stat-sub">What one Read of an unguarded root lockfile could load (bytes &divide; 4)</span>
       </div>
     </div>
 

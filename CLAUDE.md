@@ -1,6 +1,6 @@
 # Project Context & Architectural Laws (Tier 1)
 
-> **Prefix Stability Rule:** Keep this file static, concise (< 150 lines), and free of volatile task state (no active issue numbers, dates, or checkboxes) to preserve prompt cache hit rates (>80%).
+> **Prefix Stability Rule:** Keep this file static, concise (< 150 lines), and free of volatile task state (no active issue numbers, dates, or checkboxes): it is re-sent on every turn, so every line costs tokens and competes for attention.
 
 ## 1. Core Stack & Commands
 - **Environment Doctor:** `./scripts/agent-gates/doctor.sh`

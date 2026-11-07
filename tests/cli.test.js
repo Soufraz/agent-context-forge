@@ -298,7 +298,14 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.ok(report.pillars.pillar4);
     assert.ok(report.pillars.pillar5);
 
+    // Report only what was measured, never figures derived from the score
+    assert.equal(report.cacheHitRate, undefined);
+    assert.equal(report.measurements.tier1.file, 'CLAUDE.md');
+    assert.ok(report.measurements.tier1.lines > 0);
+    assert.equal(report.measurements.unprotectedLockfileTokens, 0);
+
     const html = generateHtmlReport(report);
+    assert.ok(!/cache hit/i.test(html), 'no estimated cache hit rate in the dashboard');
     assert.ok(html.includes('Context Health Audit Dashboard'));
     assert.ok(html.includes(`${report.totalScore}`));
     assert.ok(html.includes('Pillar 1'));

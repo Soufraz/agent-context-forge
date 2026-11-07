@@ -30,7 +30,7 @@ export function auditPillar1(projectDir) {
       title: 'No Tier-1 Context File Found',
       description: 'Neither CLAUDE.md nor AGENTS.md was found in the repository root. Agents have no static instruction anchor.'
     });
-    return { score: 0, maxScore, findings };
+    return { score: 0, maxScore, findings, stats: null };
   }
 
   // 2. Line count & compactness check (8 pts)
@@ -45,7 +45,7 @@ export function auditPillar1(projectDir) {
     findings.push({
       status: 'pass',
       title: `Tier-1 Context is Compact (${lineCount} lines / ~${estimatedTokens} tokens)`,
-      description: 'File is well under the 150-line threshold, preserving high prompt cache efficiency.'
+      description: 'File is well under the 150-line threshold. It is re-sent on every turn, so every line costs tokens and attention.'
     });
   } else if (lineCount <= 250) {
     score += 4;
@@ -58,7 +58,7 @@ export function auditPillar1(projectDir) {
     findings.push({
       status: 'fail',
       title: `Tier-1 Context is Bloated (${lineCount} lines / ~${estimatedTokens} tokens)`,
-      description: 'Exceeds 250 lines. Large root prefixes reduce prompt cache efficiency and waste context RAM on every prompt.'
+      description: 'Exceeds 250 lines. A large root prefix is re-sent on every turn, costing tokens and diluting the instructions that matter.'
     });
   }
 
@@ -95,7 +95,7 @@ export function auditPillar1(projectDir) {
     findings.push({
       status: 'fail',
       title: `${volatileViolations.length} Volatile Marker(s) Detected in ${path.basename(targetFile)}`,
-      description: 'Frequently changing items invalidate prompt cache prefixes on every edit.',
+      description: 'Task state goes stale, crowds out durable rules, and each edit costs a prompt-cache miss at the next session start.',
       details: volatileViolations.slice(0, 8)
     });
   }
@@ -170,5 +170,6 @@ export function auditPillar1(projectDir) {
     });
   }
 
-  return { score, maxScore, findings };
+  const stats = { file: path.basename(targetFile), lines: lineCount, tokens: estimatedTokens };
+  return { score, maxScore, findings, stats };
 }

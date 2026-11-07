@@ -47,7 +47,7 @@ Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/
 
 1. Tier 1 Immutability & Compactness (`CLAUDE.md` / `AGENTS.md`):
    - Must stay compact (< 150 lines / ~1,000 tokens) and contain only static, project-wide architecture rules, conventions, commands, and on-demand pointers.
-   - Must NOT contain volatile task/sprint state (active issue numbers, calendar deadlines/due dates, `TODO`/`FIXME`/`WIP` notes, or task checkboxes `- [ ]`) that change frequently and invalidate prompt prefix caches.
+   - Must NOT contain volatile task/sprint state (active issue numbers, calendar deadlines/due dates, `TODO`/`FIXME`/`WIP` notes, or task checkboxes `- [ ]`) that goes stale, crowds out durable rules, and changes the prompt prefix on every edit.
 
 2. Tier 2 Delta-Only & On-Demand Loading (`.claude/agents/` & `.claude/skills/`):
    - Agent and skill files must only define role-specific or skill-specific deltas; they must NOT duplicate rules, commands, or stack descriptions already in `CLAUDE.md` / `AGENTS.md`.

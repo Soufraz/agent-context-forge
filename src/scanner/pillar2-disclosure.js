@@ -150,5 +150,7 @@ export function auditPillar2(projectDir) {
     }
   }
 
-  return { score, maxScore, findings };
+  // Tokens a single Read of an unprotected lockfile could load (bytes / 4)
+  const unprotectedTokens = protectsLockfiles ? 0 : foundTokenBombs.reduce((sum, f) => sum + f.estTokens, 0);
+  return { score, maxScore, findings, stats: { unprotectedTokens } };
 }

@@ -31,29 +31,19 @@ export function auditProject(projectDir = process.cwd()) {
 
   let grade = 'F';
   let gradeLabel = 'Severe Context Rot Risk';
-  let cacheHitRate = '< 40%';
-  let tokenWasteRisk = 'Critical (> 60% Waste)';
 
   if (totalScore >= 90) {
     grade = 'A';
     gradeLabel = 'Optimal Context Health';
-    cacheHitRate = '85% – 95%';
-    tokenWasteRisk = 'Minimal (< 5%)';
   } else if (totalScore >= 80) {
     grade = 'B';
     gradeLabel = 'Good Context Stability';
-    cacheHitRate = '70% – 85%';
-    tokenWasteRisk = 'Low (~10–20%)';
   } else if (totalScore >= 70) {
     grade = 'C';
     gradeLabel = 'Needs Attention';
-    cacheHitRate = '50% – 70%';
-    tokenWasteRisk = 'Moderate (~30–45%)';
   } else if (totalScore >= 60) {
     grade = 'D';
     gradeLabel = 'At Risk of Context Drift';
-    cacheHitRate = '40% – 50%';
-    tokenWasteRisk = 'High (~50–60%)';
   }
 
   return {
@@ -64,8 +54,11 @@ export function auditProject(projectDir = process.cwd()) {
     maxScore,
     grade,
     gradeLabel,
-    cacheHitRate,
-    tokenWasteRisk,
+    // Measured from the repo, not estimated from the score
+    measurements: {
+      tier1: pillar1.stats,
+      unprotectedLockfileTokens: pillar2.stats.unprotectedTokens
+    },
     pillars: {
       pillar1: { name: 'Prefix Stability', ...pillar1 },
       pillar2: { name: 'Progressive Disclosure (LSP)', ...pillar2 },

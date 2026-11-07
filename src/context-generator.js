@@ -63,7 +63,7 @@ export function generateProjectContext(options = {}) {
 
   const claudeMdContent = `# ${projectName} — Context & Architectural Laws (Tier 1)
 
-> **Prefix Stability Rule:** Static root prefix (< 150 lines). Zero volatile state (no checkboxes or issue IDs) to maintain >80% prompt cache hit rates.
+> **Prefix Stability Rule:** Static root prefix (< 150 lines). Zero volatile state (no checkboxes or issue IDs): it is re-sent on every turn, so every line costs tokens and competes for attention.
 
 ## 1. Project Overview & Stack
 - **Project:** ${projectName}

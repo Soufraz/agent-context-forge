@@ -37,7 +37,7 @@ export async function runCli() {
     )} | ${pc.cyan('Repository & Memory = Disk')} ${pc.white('(queried on demand)')}\n\n` +
       `${asciiChart}\n\n` +
       `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
-      `  ${pc.yellow('1. Prefix Stability')}       → Freeze Tier-1 root rules (<150 lines) for >80% prompt cache hits.\n` +
+      `  ${pc.yellow('1. Prefix Stability')}       → Keep Tier-1 root rules small and static (<150 lines); they ride along on every turn.\n` +
       `  ${pc.yellow('2. Progressive Disclosure')} → Query compiler symbols (LSP) instead of reading 400-line files.\n` +
       `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK.\n` +
       `  ${pc.yellow('4. Context Isolation')}      → Delegate sprawling searches to subagents; keep chat flat.\n` +
@@ -187,10 +187,13 @@ async function runScanAndReport(projectDir) {
       `${report.totalScore} / ${report.maxScore} (Grade ${report.grade})`
     )} &bull; ${report.gradeLabel}`
   );
+  const { tier1, unprotectedLockfileTokens } = report.measurements;
   p.log.message(
-    `  ${pc.bold('Est. Cache Hit Rate:')} ${pc.cyan(
-      report.cacheHitRate
-    )}  |  ${pc.bold('Token Waste Risk:')} ${report.tokenWasteRisk}`
+    `  ${pc.bold('Tier-1 Context:')} ${pc.cyan(
+      tier1 ? `${tier1.file}, ${tier1.lines} lines (~${tier1.tokens} tokens)` : 'missing'
+    )}  |  ${pc.bold('Unprotected Lockfiles:')} ${
+      unprotectedLockfileTokens > 0 ? pc.red(`~${unprotectedLockfileTokens} tokens`) : pc.green('none')
+    }`
   );
   p.log.message(`  ${pc.bold('Report Path:')} ${pc.dim(reportPath)}\n`);
 

@@ -2,7 +2,7 @@
 
 # 🛠️ Agent Context Forge
 
-**An open-source CLI auditor and context-engineering harness that stops AI coding agents from busting prompt caches, reading 80k-token lockfiles, and polluting their own context window.**
+**An open-source CLI auditor and context-engineering harness that stops AI coding agents from bloating their root rules, reading 80k-token lockfiles, and polluting their own context window.**
 
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#the-5-pillars-under-the-hood)
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
@@ -39,7 +39,7 @@ The root cause rarely lies in the model weights—it is **unmanaged context entr
 
 | Failure Mode | What Happens by Default | How `agent-context-forge` Fixes It |
 | :--- | :--- | :--- |
-| **1. Prompt Cache Thrashing** | Storing sprint checklists (`- [ ]`), issue IDs (`#123`), or `TODO`s in `CLAUDE.md` invalidates the provider's KV prefix cache on every edit. | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
+| **1. Root Context Bloat & Churn** | Sprint checklists (`- [ ]`), issue IDs (`#123`), and `TODO`s pile up in `CLAUDE.md`. That file is re-sent on every turn, so each stale line costs tokens and dilutes the rules that matter. (Each edit also costs one prompt-cache miss at the next session start, but caches expire within minutes to an hour anyway, so size and focus matter more.) | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
 | **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Guides you to Claude Code's code intelligence plugin for your language (compiler-backed symbol jumps) + hard `permissions.deny` rules on token-bomb files. |
 | **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook transparently rewrites standalone test/git commands through [`rtk`](https://github.com/rtk-ai/rtk), collapsing passing suites (`✓ 142 passed`) while keeping 100% of failure diffs. |
 | **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls in the primary session and blocks every `10th`, pushing delegation to an isolated subagent (`Agent` tool). |
@@ -85,7 +85,7 @@ Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-rep
   <img src="assets/report-mocks/suggestion1-executive-dashboard.svg" alt="Context Health Audit Dashboard Simulation" width="880">
 </p>
 
-* **Context Health Score (0–100 / Grade A–F)** + estimated **Prompt Cache Hit Rate** and **Token Waste Risk**.
+* **Context Health Score (0–100 / Grade A–F)** + measured **Tier-1 size** (lines, ~tokens) and **Unprotected Lockfile Exposure** (~tokens one stray `Read` could load). The tool doesn't report cache hit rates or token savings it hasn't measured.
 * **Exact `File:Line` Violations:** Pinpoints volatile markers (`TODO`, checkboxes, dates) and dead file paths inside `CLAUDE.md` / `AGENTS.md`.
 * **Live Token-Bomb Exposure:** Scans the repo for unprotected lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`) and calculates how many thousands of tokens an accidental `Read` will cost.
 * **What the score measures:** how closely the repo follows the five pillars as this tool defines them. Treat it as a setup checklist, not a benchmark. A hook earns points only when it is wired in settings and its script exists, and equivalents count (rtk's own `rtk init -g` hook, any `PreCompact` or `SessionStart` `compact` hook). Two checks (16 points) look specifically for this harness's commit gate and exploration guardrail.

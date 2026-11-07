@@ -40,7 +40,7 @@ The root cause rarely lies in the model weights—it is **unmanaged context entr
 | Failure Mode | What Happens by Default | How `agent-context-forge` Fixes It |
 | :--- | :--- | :--- |
 | **1. Prompt Cache Thrashing** | Storing sprint checklists (`- [ ]`), issue IDs (`#123`), or `TODO`s in `CLAUDE.md` invalidates the provider's KV prefix cache on every edit. | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
-| **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Enables native compiler LSP (`ENABLE_LSP_TOOL=1`) for ~50ms symbol jumps + hard `permissions.deny` rules on token-bomb files. |
+| **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Guides you to Claude Code's code intelligence plugin for your language (compiler-backed symbol jumps) + hard `permissions.deny` rules on token-bomb files. |
 | **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook transparently rewrites standalone test/git commands through [`rtk`](https://github.com/rtk-ai/rtk), collapsing passing suites (`✓ 142 passed`) while keeping 100% of failure diffs. |
 | **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls in the primary session and blocks every `10th`, pushing delegation to an isolated subagent (`Agent` tool). |
 | **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that snapshots active git state before compaction. |
@@ -89,7 +89,7 @@ Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-rep
 * **Exact `File:Line` Violations:** Pinpoints volatile markers (`TODO`, checkboxes, dates) and dead file paths inside `CLAUDE.md` / `AGENTS.md`.
 * **Live Token-Bomb Exposure:** Scans the repo for unprotected lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`) and calculates how many thousands of tokens an accidental `Read` will cost.
 * **What the score measures:** how closely the repo follows the five pillars as this tool defines them. Treat it as a setup checklist, not a benchmark. A hook earns points only when it is wired in settings and its script exists, and equivalents count (rtk's own `rtk init -g` hook, any `PreCompact` or `SessionStart` `compact` hook). Two checks (16 points) look specifically for this harness's commit gate and exploration guardrail.
-* **Interactive Remediation:** Offers to automatically install missing binaries (`rtk`, `@vtsls/language-server`, `pyright`) right from the terminal.
+* **Interactive Remediation:** Offers to automatically install missing binaries (`rtk`, `typescript-language-server`, `pyright`) right from the terminal, and prints the code intelligence plugin to install for your language.
 
 ### 2. Modular Stack Configurator (`Install` Mode)
 Lets you customize each layer instead of forcing a rigid template:
@@ -120,7 +120,7 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 
 ### Pillar 2: Progressive Disclosure via LSP & Token-Bomb Denials
 * **Files:** [`.claude/settings.json`](.claude/settings.json) + [`scripts/agent-gates/check-lsp.sh`](scripts/agent-gates/check-lsp.sh)
-* **Mechanism:** Exports `"ENABLE_LSP_TOOL": "1"` so Claude Code uses `LSPGoToDefinition`, `LSPFindReferences`, and `LSPDocumentSymbols` instead of reading full files.
+* **Mechanism:** Claude Code's `LSP` tool (go to definition, find references, diagnostics after edits) stays off until you install a [code intelligence plugin](https://code.claude.com/docs/en/plugins/code-intelligence) for your language, and a language server on `PATH` is not enough on its own. The doctor and scanner check for both the plugin (e.g. `claude plugin install typescript-lsp@claude-plugins-official`) and the binary it starts (e.g. `typescript-language-server`).
 * **Hard Denials:** Pre-populates `permissions.deny` for `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `node_modules/**`, `dist/**`, `.next/**`, and `*.min.js`.
 
 ### Pillar 3: Transparent Observation Masking (`rtk`)
@@ -162,7 +162,7 @@ While all hooks are production-ready for **Claude Code** and **Universal Git** t
 | **Universal Git (CLI / IDEs)** | Standard Git pre-commit wrapper in `.githooks/pre-commit` | ✅ **Production Ready** |
 | **Gemini CLI / Antigravity** | `.agents/rules/` + Tool Execution Policy adapters | 🚧 [Issue #1](https://github.com/Soufraz/agent-context-forge/issues/1) |
 | **OpenCode / Aider** | `AGENTS.md` + `.agents/` universal standard | 🚧 [Issue #1](https://github.com/Soufraz/agent-context-forge/issues/1) |
-| **Multi-LSP & Compressor Adapters** | Pluggable LSP & output masking alternatives beyond `vtsls` / `rtk` | 🚧 [Issue #2](https://github.com/Soufraz/agent-context-forge/issues/2), [Issue #3](https://github.com/Soufraz/agent-context-forge/issues/3) |
+| **Multi-LSP & Compressor Adapters** | Pluggable LSP & output masking alternatives beyond the official LSP plugins / `rtk` | 🚧 [Issue #2](https://github.com/Soufraz/agent-context-forge/issues/2), [Issue #3](https://github.com/Soufraz/agent-context-forge/issues/3) |
 
 ---
 
@@ -192,7 +192,7 @@ Brilliant creators across the open-source community have built focused, high-imp
 We extend our deepest respect and fair-use attribution to the creators whose tools, research, and ideas made this project possible:
 
 * **[`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) by [@rtk-ai](https://github.com/rtk-ai):** An outstanding, blisteringly fast Rust tool that revolutionizes tool-call observation masking by collapsing passing test suites while retaining 100% of failure diffs.
-* **Anthropic & Claude Code:** For pioneering native compiler-backed LSP tool discovery (`LSPGoToDefinition`, `LSPFindReferences`), deterministic shell lifecycle hooks (`SessionStart`, `PreToolUse`, `PreCompact`), and machine-local two-tier Auto-Memory.
+* **Anthropic & Claude Code:** For native compiler-backed code intelligence through LSP plugins, deterministic shell lifecycle hooks (`SessionStart`, `PreToolUse`, `PreCompact`), and machine-local two-tier Auto-Memory.
 * **[`@clack/prompts`](https://github.com/natemoo-re/clack) & [`picocolors`](https://github.com/alexeyraspopov/picocolors) by Nate Moore & Alexey Raspopov:** For crafting the clean, accessible, terminal UI and formatting primitives that power the interactive CLI wizard.
 * **Layer-2 Methodology Creators & Communities:**
   * **[Superpowers SDD](https://github.com/obra/superpowers) by Jesse Vincent (`obra/superpowers`):** For pioneering systematic subagent dispatching, strict TDD red-green-refactor loops, and structured planning.

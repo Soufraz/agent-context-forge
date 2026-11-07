@@ -225,7 +225,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'native',
         label: 'Claude Native LSP (Default, recommended)',
-        hint: 'Compiler-backed symbol navigation (~70% token savings)'
+        hint: 'Compiler-backed symbol navigation via a code intelligence plugin'
       },
       {
         value: 'custom',

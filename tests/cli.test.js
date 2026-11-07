@@ -9,6 +9,7 @@ import { generateProjectContext } from '../src/context-generator.js';
 import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
+import { auditPillar2 } from '../src/scanner/pillar2-disclosure.js';
 import {
   auditPillar4,
   parseAgentFrontmatter,
@@ -77,7 +78,7 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     const settingsPath = path.join(tmpProject, '.claude', 'settings.json');
     assert.ok(fs.existsSync(settingsPath));
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    assert.equal(settings.env.ENABLE_LSP_TOOL, '1');
+    assert.equal(settings.env?.ENABLE_LSP_TOOL, undefined, 'no settings flag enables the LSP tool');
     assert.ok(Array.isArray(settings.permissions.deny));
     assert.ok(settings.permissions.deny.some((r) => r.includes('lock')));
     assert.ok(settings.hooks.SessionStart);
@@ -237,6 +238,42 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(userClaudeDir, { recursive: true, force: true });
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('auditPillar2: LSP points need the plugin and server for the repo language', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_lsp_'));
+    const mockBin = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_lsp_bin_'));
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${mockBin}:/usr/bin:/bin`;
+    const fakeBinary = (name) => fs.writeFileSync(path.join(mockBin, name), '#!/bin/sh\n', { mode: 0o755 });
+    const lspScore = () => {
+      const report = auditPillar2(tmpProject);
+      // Leave out the token-bomb checks (8 pts) that don't depend on LSP setup
+      return report.score - (report.findings.some((f) => f.title.startsWith('No Raw Lockfiles')) ? 4 : 0);
+    };
+
+    try {
+      fs.writeFileSync(path.join(tmpProject, 'package.json'), '{}');
+      assert.equal(lspScore(), 0);
+
+      // A Python server earns nothing in a TypeScript repo
+      fakeBinary('pyright-langserver');
+      assert.equal(lspScore(), 0);
+
+      fakeBinary('typescript-language-server');
+      assert.equal(lspScore(), 8);
+
+      fs.mkdirSync(path.join(tmpProject, '.claude'));
+      fs.writeFileSync(
+        path.join(tmpProject, '.claude', 'settings.json'),
+        JSON.stringify({ enabledPlugins: { 'typescript-lsp@claude-plugins-official': true } })
+      );
+      assert.equal(lspScore(), 12);
+    } finally {
+      process.env.PATH = originalPath;
+      fs.rmSync(tmpProject, { recursive: true, force: true });
+      fs.rmSync(mockBin, { recursive: true, force: true });
+    }
   });
 
   test('auditProject and generateHtmlReport: produces score, grade, and visual HTML dashboard', () => {

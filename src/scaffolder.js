@@ -185,11 +185,8 @@ export function scaffoldProject(targetDir, options = {}) {
     $schema: 'https://json.schemastore.org/claude-code-settings.json'
   };
 
-  if (lsp === 'native') {
-    settings.env = {
-      ENABLE_LSP_TOOL: '1'
-    };
-  }
+  // No settings flag turns on Claude Code's LSP tool: it needs a code intelligence plugin,
+  // which the installer offers after scaffolding (see lsp-plugins.js).
 
   // Always protect against accidental lockfile & build token bombs
   settings.permissions = {

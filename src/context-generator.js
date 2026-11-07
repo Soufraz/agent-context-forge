@@ -53,7 +53,7 @@ export function generateProjectContext(options = {}) {
   // 3. LSP & Masking notes
   const lspNote =
     lsp === 'native'
-      ? '- **Progressive Disclosure (LSP First):** Always query language server symbols (`goToDefinition`, `documentSymbol`) before reading whole files.'
+      ? '- **Progressive Disclosure (LSP First):** When the `LSP` tool is available (a code intelligence plugin is installed), query symbols (`goToDefinition`, `documentSymbol`) before reading whole files.'
       : `- **Progressive Disclosure:** Use ${typeof lsp === 'object' && lsp.custom ? lsp.custom : 'configured code intelligence'} to navigate symbols.`;
 
   const maskingNote =

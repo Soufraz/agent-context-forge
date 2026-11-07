@@ -27,7 +27,6 @@ echo "=== Running Agent Context Forge Self-Test Suite ==="
 # 1. Validate .claude/settings.json structure
 echo "[1/5] Checking .claude/settings.json configuration..."
 assert_ok "Valid JSON syntax" jq empty .claude/settings.json
-assert_ok "LSP flag enabled (Pillar 2)" jq -e '.env.ENABLE_LSP_TOOL == "1"' .claude/settings.json
 assert_ok "Token-bomb read denials present (Pillar 2)" jq -e '.permissions.deny | length >= 10' .claude/settings.json
 assert_ok "SessionStart, PreToolUse & PreCompact hooks wired" jq -e '.hooks.SessionStart and .hooks.PreToolUse and .hooks.PreCompact' .claude/settings.json
 

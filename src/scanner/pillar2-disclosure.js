@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { inspectDirectory } from '../detector.js';
+import { isPluginEnabled, lspPluginsFor, pluginInstallCommand } from '../lsp-plugins.js';
+import { loadSettingsLayers } from './settings.js';
 
 /**
  * Audits Pillar 2: Progressive Disclosure via Language Server Protocol & Token Bomb Protection
@@ -19,24 +22,6 @@ export function auditPillar2(projectDir) {
     } catch {}
   }
 
-  // 1. ENABLE_LSP_TOOL flag in settings.json (4 pts)
-  const lspFlag = settings?.env?.ENABLE_LSP_TOOL;
-  if (lspFlag === '1' || lspFlag === 1) {
-    score += 4;
-    findings.push({
-      status: 'pass',
-      title: 'Native LSP Intelligence Enabled (ENABLE_LSP_TOOL=1)',
-      description: 'Claude Code is configured to use language server symbol queries.'
-    });
-  } else {
-    findings.push({
-      status: 'warn',
-      title: 'ENABLE_LSP_TOOL Flag Missing',
-      description: 'Claude Code will rely on broad text search instead of compiler-backed symbol navigation.'
-    });
-  }
-
-  // 2. Language Server binary on PATH (8 pts)
   const isCommandAvailable = (cmd) => {
     try {
       execSync(`command -v ${cmd}`, { stdio: 'ignore' });
@@ -46,27 +31,56 @@ export function auditPillar2(projectDir) {
     }
   };
 
-  const detectedLSPs = [];
-  if (isCommandAvailable('vtsls')) detectedLSPs.push('vtsls (TypeScript)');
-  if (isCommandAvailable('typescript-language-server')) detectedLSPs.push('typescript-language-server');
-  if (isCommandAvailable('pyright')) detectedLSPs.push('pyright (Python)');
-  if (isCommandAvailable('pylsp')) detectedLSPs.push('pylsp (Python)');
-  if (isCommandAvailable('gopls')) detectedLSPs.push('gopls (Go)');
-  if (isCommandAvailable('rust-analyzer')) detectedLSPs.push('rust-analyzer (Rust)');
+  // Score only the language servers for this repo's own languages
+  const servers = lspPluginsFor(inspectDirectory(projectDir).projectTypes);
+  const layers = loadSettingsLayers(projectDir);
 
-  if (detectedLSPs.length > 0) {
-    score += 8;
-    findings.push({
-      status: 'pass',
-      title: `Language Server(s) Available: ${detectedLSPs.join(', ')}`,
-      description: 'Progressive symbol resolution (goToDefinition, findReferences) is ready to operate.'
-    });
-  } else {
+  if (servers.length === 0) {
     findings.push({
       status: 'warn',
-      title: 'No Supported Language Server Detected on PATH',
-      description: 'Install a language server (e.g. npm i -g @vtsls/language-server, pyright, gopls, or rust-analyzer) to enable ~70% token savings on symbol lookups.'
+      title: 'No Language With an Official Code Intelligence Plugin Detected',
+      description:
+        'LSP navigation needs a code intelligence plugin for the repo language (see https://code.claude.com/docs/en/plugins/code-intelligence).'
     });
+  } else {
+    // 1. Code intelligence plugin enabled for each language (4 pts). This, not a settings
+    //    flag, is what turns on Claude Code's LSP tool.
+    const missingPlugins = servers.filter((server) => !isPluginEnabled(layers, server.plugin));
+    score += Math.round((4 * (servers.length - missingPlugins.length)) / servers.length);
+    if (missingPlugins.length === 0) {
+      findings.push({
+        status: 'pass',
+        title: `Code Intelligence Plugin Enabled: ${servers.map((s) => s.plugin).join(', ')}`,
+        description: "Claude Code's LSP tool is active for this repo's languages."
+      });
+    } else {
+      findings.push({
+        status: 'warn',
+        title: `Code Intelligence Plugin Not Enabled: ${missingPlugins.map((s) => s.plugin).join(', ')}`,
+        description: `Claude Code keeps its LSP tool off until the plugin is installed. Run: ${missingPlugins
+          .map(pluginInstallCommand)
+          .join(' && ')}`
+      });
+    }
+
+    // 2. The binary each plugin starts is on PATH (8 pts)
+    const missingBinaries = servers.filter((server) => !isCommandAvailable(server.binary));
+    score += Math.round((8 * (servers.length - missingBinaries.length)) / servers.length);
+    if (missingBinaries.length === 0) {
+      findings.push({
+        status: 'pass',
+        title: `Language Server(s) Available: ${servers.map((s) => `${s.binary} (${s.language})`).join(', ')}`,
+        description: 'Progressive symbol resolution (goToDefinition, findReferences) is ready to operate.'
+      });
+    } else {
+      findings.push({
+        status: 'warn',
+        title: `Language Server Missing for ${missingBinaries.map((s) => s.language).join(', ')}`,
+        description: `The code intelligence plugin needs its binary on PATH. Install: ${missingBinaries
+          .map((s) => s.install)
+          .join(' && ')}`
+      });
+    }
   }
 
   // 3. permissions.deny Token-Bomb configuration (4 pts)

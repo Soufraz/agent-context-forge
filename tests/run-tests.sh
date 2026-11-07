@@ -42,6 +42,27 @@ echo "[3/5] Checking pre-commit-prefix-stability.sh fast filter..."
 FAST_OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"git status"}}' | "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh")"
 assert_ok "Non-commit Bash command bypasses LLM gate with 0 output" test -z "$FAST_OUT"
 
+# `git commit` reaches the model only when a context file has pending changes
+GATE_REPO="$(mktemp -d)"
+GATE_BIN="$(mktemp -d)"
+printf '#!/usr/bin/env bash\ntouch "%s/called"\necho %s\n' "$GATE_BIN" "'{\"ok\":true,\"reason\":\"Passed\"}'" > "$GATE_BIN/claude"
+chmod +x "$GATE_BIN/claude"
+git -C "$GATE_REPO" init -q
+printf '# Rules\n' > "$GATE_REPO/CLAUDE.md"
+printf 'x\n' > "$GATE_REPO/app.txt"
+git -C "$GATE_REPO" add -A
+git -C "$GATE_REPO" -c user.email=t@t -c user.name=t commit -qm init
+COMMIT_PAYLOAD='{"tool_name":"Bash","tool_input":{"command":"git add -A && git commit -m wip"}}'
+
+printf 'y\n' >> "$GATE_REPO/app.txt"
+printf '%s' "$COMMIT_PAYLOAD" | PATH="$GATE_BIN:$PATH" CLAUDE_PROJECT_DIR="$GATE_REPO" "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" >/dev/null
+assert_ok "Commit without context changes skips the model call" test ! -e "$GATE_BIN/called"
+
+printf -- '- New rule\n' >> "$GATE_REPO/CLAUDE.md"
+printf '%s' "$COMMIT_PAYLOAD" | PATH="$GATE_BIN:$PATH" CLAUDE_PROJECT_DIR="$GATE_REPO" "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" >/dev/null
+assert_ok "Commit with unstaged CLAUDE.md change runs the model audit" test -e "$GATE_BIN/called"
+rm -rf "$GATE_REPO" "$GATE_BIN"
+
 # 4. Validate RTK Command Rewriter (Pillar 3)
 echo "[4/5] Checking rewrite-rtk.sh command compression hook..."
 MOCK_BIN="$(mktemp -d)"

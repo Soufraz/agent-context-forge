@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Hybrid PreToolUse Hook:
-# 1. Fast shell filter: exits 0 immediately (0 tokens) if Bash command is not `git commit`.
-# 2. LLM gate: runs a read-only Claude evaluation on `git commit` to enforce 
-#    Prefix Stability & Cache Optimization rules for any project.
+# 1. Fast shell filter: exits 0 immediately (0 tokens) if the Bash command is not
+#    `git commit`, or if no agent context file has pending changes.
+# 2. LLM gate: otherwise runs a read-only `claude -p --model haiku` evaluation, which
+#    sends the context files and diff to the model, to enforce Prefix Stability &
+#    Cache Optimization rules for any project.
 
 set -euo pipefail
 
@@ -32,9 +34,16 @@ if [ ! -f "CLAUDE.md" ] && [ ! -f "AGENTS.md" ] && [ ! -d ".claude/agents" ] && 
   exit 0
 fi
 
-# 3. Prefix Stability & Cache Optimization - LLM Audit
+# 3. Skip unless a context path has pending changes (same paths as .githooks/pre-commit).
+#    In Claude Code this runs before the command, so `git add ... && git commit` has not
+#    staged anything yet: check the working tree as well as the index.
+if [ -z "$(git status --porcelain -- CLAUDE.md AGENTS.md .claude .agents 2>/dev/null)" ]; then
+  exit 0
+fi
+
+# 4. Prefix Stability & Cache Optimization - LLM Audit
 read -r -d '' PROMPT << 'EOF' || true
-Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, `.claude/skills/`) and the staged changes (`git diff --cached`) against these Prefix Stability & Cache Optimization rules:
+Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, `.claude/skills/`) and the pending changes (`git diff --cached` and `git diff`) against these Prefix Stability & Cache Optimization rules:
 
 1. Tier 1 Immutability & Compactness (`CLAUDE.md` / `AGENTS.md`):
    - Must stay compact (< 150 lines / ~1,000 tokens) and contain only static, project-wide architecture rules, conventions, commands, and on-demand pointers.

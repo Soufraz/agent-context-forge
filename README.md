@@ -6,7 +6,7 @@
 
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#the-5-pillars-under-the-hood)
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
-[![Zero Telemetry](https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20Zero%20Telemetry-brightgreen)](#license)
+[![Zero Telemetry](https://img.shields.io/badge/Privacy-Zero%20Telemetry-brightgreen)](#license)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -106,12 +106,12 @@ Lets you customize each layer instead of forcing a rigid template:
 
 A common question with agent hooks is: *"Do these hooks slow down every tool call or burn extra tokens?"*
 
-**No.** Every hook is designed around a **zero-token deterministic fast path**:
+**Almost never.** Every hook has a **zero-token deterministic fast path**. The one exception is the commit gate below, which calls a model only when a commit touches your agent context files:
 
 ### Pillar 1: Hybrid Pre-Commit Prefix Stability Gate
 * **File:** [`.claude/hooks/pre-commit-prefix-stability.sh`](.claude/hooks/pre-commit-prefix-stability.sh) + [`.githooks/pre-commit`](.githooks/pre-commit)
-* **Fast Filter (`< 2ms`, `0 tokens`):** Every non-commit `Bash` command exits `0` immediately via a shell regex check.
-* **Commit Audit:** Only when `git commit` is invoked (and context files are present), a headless read-only evaluation (`claude -p --model haiku`) verifies:
+* **Fast Filter (`< 2ms`, `0 tokens`):** Every non-commit `Bash` command exits `0` immediately via a shell regex check, and so does every `git commit` while `CLAUDE.md`, `AGENTS.md`, `.claude/`, and `.agents/` have no pending changes.
+* **Commit Audit (not free, not local):** When a commit does touch those paths, a headless read-only evaluation (`claude -p --model haiku`) runs under your Claude Code login. It sends your context files and diff to the model and uses tokens. It verifies:
   1. `CLAUDE.md` / `AGENTS.md` stays `< 150 lines` (`~1,000 tokens`).
   2. Zero volatile task state (no checkboxes, issue IDs, or deadlines).
   3. Zero duplicate rules between Tier 1 (`CLAUDE.md`) and Tier 2 (`.claude/agents/`, `.claude/skills/`).

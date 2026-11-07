@@ -3,6 +3,24 @@
   "env": {
     "ENABLE_LSP_TOOL": "1"
   },
+  "permissions": {
+    "deny": [
+      "Read(**/package-lock.json)",
+      "Read(**/pnpm-lock.yaml)",
+      "Read(**/yarn.lock)",
+      "Read(**/Cargo.lock)",
+      "Read(**/poetry.lock)",
+      "Read(**/uv.lock)",
+      "Read(**/node_modules/**)",
+      "Read(**/dist/**)",
+      "Read(**/build/**)",
+      "Read(**/.next/**)",
+      "Read(**/coverage/**)",
+      "Read(**/*.min.js)",
+      "Read(**/*.min.css)",
+      "Read(**/*.map)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -10,7 +28,7 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/agent-gates/doctor.sh\"",
-            "statusMessage": "Checking agent context environment (LSP & RTK readiness)..."
+            "statusMessage": "Checking agent context environment (LSP, RTK & Memory readiness)..."
           }
         ]
       }

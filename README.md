@@ -174,12 +174,56 @@ This boilerplate provides the **underlying context and safety harness**; you rem
 
 ---
 
+## 🚀 Quickstart: 1-Command CLI & Scanner
+
+Run the interactive CLI directly in any directory (empty or existing):
+
+```bash
+npx agent-context-forge
+```
+
+### What Happens When You Run It?
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        $ npx agent-context-forge                       │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+    ┌───────────────────────────────┴───────────────────────────────┐
+    ▼                                                               ▼
+[📂 Empty Directory Detected]                   [🔍 Existing Codebase Detected]
+    │                                                               │
+    ├─► Select LLM Engine (Claude Code)                             ├─► ⚡ Scan & Open HTML Audit Report
+    ├─► Customize Stack:                                            │   • Scores 0–100 across 5 Pillars
+    │   • LSP (Native or Custom)                                    │   • Finds dead paths & volatile markers
+    │   • Observation Masking (RTK)                                 │   • Exposes unprotected lockfiles
+    │   • Isolation (Guardrail / Orchestrator)                      │   • Auto-opens visual report in browser
+    │   • Episodic Memory (Auto-Memory / context-mode)              │
+    │   • SDD (Superpowers, GSD, ECC, Elephant-Goldfish)            └─► 🚀 Inject / Upgrade Harness
+    └─► Optional: Drop project context to generate custom rules!        (Safely merges hooks & doctor gates)
+```
+
+1. **In an empty folder:** Guides you through an interactive setup wizard to scaffold the complete 5-Pillar harness and tailored Tier-1 context rules.
+2. **In an existing project:** Offers to run the **5-Pillar Context Health Audit**, generating a self-contained dark-mode HTML dashboard (`.agent-context-report.html`) and automatically opening it in your default browser.
+
+---
+
 ## 🌐 Universal Agent Portability
 
 This boilerplate is designed to be **agent-agnostic**. While the initial hook is wired for Claude Code, the core quality gates sit in a portable layer ready to plug into any agent platform:
 
 ```
 agent-context-forge/
+├── bin/
+│   └── cli.js                           # npx / CLI executable entrypoint
+├── src/
+│   ├── index.js                         # Interactive Clack terminal wizard
+│   ├── detector.js                      # Directory inspector & stack detector
+│   ├── scaffolder.js                    # Modular harness scaffolder & manifest
+│   ├── context-generator.js             # Custom Tier-1 rules generator
+│   ├── scanner/                         # 5-Pillar Context Audit Engine
+│   └── reporter/                        # Visual HTML dashboard & browser launcher
+│
 ├── CLAUDE.md                            # Tier-1 static architectural rules (Claude Code)
 ├── AGENTS.md                            # Tier-1 universal agent instructions (OpenCode / Aider)
 ├── .claude/                             # Claude Code Configuration
@@ -206,8 +250,10 @@ agent-context-forge/
 │       └── check-memory.sh              # Episodic memory verification (Pillar 5)
 │
 ├── tests/
-│   └── run-tests.sh                     # Automated self-test suite for all 5 Pillars
+│   ├── cli.test.js                      # Node.js automated CLI & scanner tests
+│   └── run-tests.sh                     # Automated shell hook self-tests
 │
+├── package.json                         # npm package definition
 ├── LICENSE
 └── README.md
 ```
@@ -224,7 +270,9 @@ agent-context-forge/
 
 ---
 
-## 🚀 Quickstart: Starting a New Project
+## 🛠️ Manual Installation (Without NPX)
+
+If you prefer to clone and set up manually without running the interactive CLI:
 
 1. **Clone or copy this scaffold into your new repository:**
    ```bash
@@ -234,7 +282,7 @@ agent-context-forge/
 
 2. **Run the self-test & environment doctor:**
    ```bash
-   ./tests/run-tests.sh
+   npm test
    ./scripts/agent-gates/doctor.sh
    ```
 

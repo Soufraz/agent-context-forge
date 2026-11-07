@@ -26,6 +26,16 @@
             "statusMessage": "Validating context prefix stability before commit..."
           }
         ]
+      },
+      {
+        "matcher": "Read|Grep|Glob|Task|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-subagent-isolation.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

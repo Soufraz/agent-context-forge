@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Language Server Protocol (LSP) Pre-Flight & Health Check (Pillar 1b)
+# Language Server Protocol (LSP) Pre-Flight & Health Check (Pillar 2)
 # Detects project language and checks if language server binaries are available
 # so Claude Code / agents can use fast symbol navigation instead of whole-file reads.
 

@@ -1,7 +1,7 @@
 # 🛠️ Agent Context Forge
 ### *An open boilerplate and quality harness for sustainable AI-assisted software development*
 
-[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201%2C%202%20%26%203%20Ready-success)](#roadmap--future-solutions)
+[![Context Status](https://img.shields.io/badge/Context%20Engineering-Pillars%201--4%20Ready-success)](#roadmap--future-solutions)
 [![Platform](https://img.shields.io/badge/Portability-Claude%20%7C%20OpenCode%20%7C%20Antigravity%20%7C%20Universal%20Git-blue)](#universal-agent-portability)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
@@ -35,9 +35,9 @@ Our guiding principle is simple: **treat the active context window like working 
   ▼                  ▼                      ▼                  ▼              ▼
 ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
 │  Pillar 1    │   │  Pillar 2    │   │  Pillar 3    │   │  Pillar 4    │   │  Pillar 5    │
-│    Prefix    │   │ Progressive  │   │ Observation  │   │  Episodic    │   │Deterministic │
-│  Stability   │   │  Disclosure  │   │   Masking    │   │    Memory    │   │ Architecture │
-│   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │   │  [PLANNED]   │
+│    Prefix    │   │ Progressive  │   │ Observation  │   │   Context    │   │  Episodic    │
+│  Stability   │   │  Disclosure  │   │   Masking    │   │  Isolation   │   │    Memory    │
+│   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │   [ACTIVE]   │   │  [PLANNED]   │
 └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
@@ -46,8 +46,8 @@ Our guiding principle is simple: **treat the active context window like working 
 | **1. Prefix Stability** | Token Caching & Drift Gate | ✅ **Implemented** | Strict immutability for Tier 1 root context; pre-commit gate blocking volatile state and drift. |
 | **2. Progressive Disclosure** | Language Server Protocol (LSP) | ✅ **Implemented** | `ENABLE_LSP_TOOL=1` + `SessionStart` pre-flight check for compiler-backed symbol navigation. |
 | **3. Observation Masking** | Smart Tool Output Compression | ✅ **Implemented** | `rtk` (Rust Token Killer) doctor check + proxying to collapse test/build noise (~60–90% savings). |
-| **4. Episodic Memory** | Cross-Session Learning | 🚧 *Planned* | Background memory ledger capturing debug insights across git worktrees without touching prefix files. |
-| **5. Deterministic Gates** | Architectural Linters | 🚧 *Planned* | AST graph boundary checks replacing fuzzy negative prompt instructions with hard CI rules. |
+| **4. Context Isolation** | Subagent Trajectory Separation | ✅ **Implemented** | Runaway exploration guardrails + orchestrator permission scoping to keep primary context flat. |
+| **5. Episodic Memory** | Cross-Session Learning | 🚧 *Planned* | Background memory ledger capturing debug insights across git worktrees without touching prefix files. |
 
 ---
 
@@ -99,6 +99,28 @@ Standard terminal truncation is "dumb": it chops characters from the middle or e
 
 ---
 
+## 🤖 Pillar 4: Subagent Context Isolation
+
+Agents are naturally prone to running sprawling inline explorations—grepping dozens of files, hitting dead ends, and filling the primary context window with thousands of tokens of search noise.
+
+### Active by Default: Exploration Guardrail
+* **The Guardrail:** `.claude/hooks/guard-subagent-isolation.py` intercepts `PreToolUse` events for `Read`, `Grep`, and `Glob`.
+* **Exploration Threshold:** If the primary agent executes **10+ consecutive exploratory calls** without delegating to a subagent or editing code, the hook triggers a structured permission denial:
+  > *"Context Isolation Guardrail: 10 consecutive exploratory calls executed in the primary context window. To prevent context dilution, please delegate this investigation to a fresh research subagent (via Task tool) and return a concise synthesis."*
+* **Auto-Reset:** Calling the `Task` tool (subagent dispatch) or making code changes (`Write`, `Edit`) resets the counter.
+
+### Orchestrator Pattern: Tool Permission Scoping
+For large-scale feature planning, you can enforce context isolation structurally by removing write permissions from the orchestrator:
+* See the included template: [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md)
+* **How it works:** The orchestrator agent is granted `[Read, Glob, Grep, Task, Bash]`, but **`Edit` and `Write` are completely omitted**.
+* **Why it's bulletproof:** Because the orchestrator physically lacks write tools, it is **mechanically incapable** of writing code inline—it is forced to dispatch fresh implementer subagents for every task, keeping its own context window pristine.
+
+### The Elephant-Goldfish Principle
+* **The Elephant (Persistent Memory):** Long-term project memory (ADRs, schemas, git commit history) lives on disk and persists across months.
+* **The Goldfish (Disposable Working Context):** Implementer and research subagents are given short, disposable working memory. They execute a single task in an isolated scope, commit their changes, report a concise summary back to the parent, and their noisy trajectory is discarded.
+
+---
+
 ## 🌐 Universal Agent Portability
 
 This boilerplate is designed to be **agent-agnostic**. While the initial hook is wired for Claude Code, the core quality gates sit in a portable layer ready to plug into any agent platform:
@@ -106,9 +128,12 @@ This boilerplate is designed to be **agent-agnostic**. While the initial hook is
 ```
 agent-context-forge/
 ├── .claude/                             # Claude Code Configuration
-│   ├── settings.json                    # PreToolUse hook binding
+│   ├── settings.json                    # SessionStart & PreToolUse hook bindings
+│   ├── agents/
+│   │   └── orchestrator.md              # Tool Permission Scoping template
 │   └── hooks/
-│       └── pre-commit-prefix-stability.sh  # Hybrid git-commit interceptor
+│       ├── pre-commit-prefix-stability.sh  # Pre-commit context audit (Pillar 1)
+│       └── guard-subagent-isolation.py     # Runaway exploration guardrail (Pillar 4)
 │
 ├── .agents/                             # Universal Agent Standard (OpenCode / AGENTS.md)
 │   └── rules/                           # Portable rule definitions
@@ -118,6 +143,9 @@ agent-context-forge/
 │
 ├── scripts/
 │   └── agent-gates/                     # Portable, tool-agnostic validation logic
+│       ├── doctor.sh                    # Unified environment pre-flight doctor
+│       ├── check-lsp.sh                 # Language Server Protocol readiness (Pillar 2)
+│       └── check-rtk.sh                 # Observation masking check (Pillar 3)
 │
 └── README.md
 ```
@@ -155,8 +183,8 @@ agent-context-forge/
 - [x] **Pillar 1:** Universal Prefix Stability & Pre-Commit Hook (Active)
 - [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol (Active)
 - [x] **Pillar 3:** Smart Observation Masking via `rtk` (Active)
-- [ ] **Pillar 4:** Background Episodic Memory Ledger (`claude-mem` integration with cache-protection)
-- [ ] **Pillar 5:** Deterministic Monorepo / Boundary Linters (`dependency-cruiser` configs)
+- [x] **Pillar 4:** Subagent Context Isolation & Exploration Guardrails (Active)
+- [ ] **Pillar 5:** Background Episodic Memory Ledger (`claude-mem` integration with cache-protection)
 - [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.
 
 ---

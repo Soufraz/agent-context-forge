@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rust Token Killer (RTK) Pre-Flight Check (Pillar 1c)
+# Rust Token Killer (RTK) Pre-Flight Check (Pillar 3)
 # Checks if `rtk` is available to compress terminal and test outputs before entering context.
 
 set -euo pipefail

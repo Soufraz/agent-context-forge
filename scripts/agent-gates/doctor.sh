@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Agent Context Forge Environment Doctor
-# Runs pre-flight checks for LSP Code Intelligence (1b) and RTK Observation Masking (1c).
+# Runs pre-flight checks for LSP Code Intelligence (Pillar 2) and RTK Observation Masking (Pillar 3).
 
 set -euo pipefail
 

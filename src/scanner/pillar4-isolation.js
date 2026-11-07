@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { findHook, loadSettingsLayers } from './settings.js';
 
 // Keys people reach for that Claude Code does not recognize; it ignores them without an error,
 // so the subagent silently inherits every tool.
@@ -59,24 +60,26 @@ export function auditPillar4(projectDir) {
   const maxScore = 20;
   const findings = [];
 
-  const settingsPath = path.join(projectDir, '.claude', 'settings.json');
-  let hasGuardrailHook = false;
-  if (fs.existsSync(settingsPath)) {
-    try {
-      const rawSettings = fs.readFileSync(settingsPath, 'utf-8');
-      if (rawSettings.includes('guard-subagent-isolation.py')) {
-        hasGuardrailHook = true;
-      }
-    } catch {}
-  }
+  // 1. Exploration Guardrail Hook (12 pts; checks for this harness's guardrail)
+  const guardrail = findHook(
+    projectDir,
+    loadSettingsLayers(projectDir),
+    'PreToolUse',
+    /guard-subagent-isolation\.py/
+  );
 
-  // 1. Exploration Guardrail Hook (12 pts)
-  if (hasGuardrailHook) {
+  if (guardrail.working) {
     score += 12;
     findings.push({
       status: 'pass',
       title: 'Subagent Exploration Guardrail Active',
       description: 'PreToolUse hook blocks runaway inline searches (10+ Read/Grep calls) and enforces subagent delegation.'
+    });
+  } else if (guardrail.wired) {
+    findings.push({
+      status: 'fail',
+      title: 'Exploration Guardrail Points to a Missing Script',
+      description: `The hook is wired but cannot run: ${guardrail.broken.join(', ')}`
     });
   } else {
     findings.push({

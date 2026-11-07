@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { hookCommands, loadSettingsLayers, projectScriptStatus } from './settings.js';
 
 /**
  * Audits Pillar 5: Episodic Memory & Lossy Compaction Protection
@@ -11,19 +12,15 @@ export function auditPillar5(projectDir) {
   const maxScore = 15;
   const findings = [];
 
-  const settingsPath = path.join(projectDir, '.claude', 'settings.json');
-  let settings = {};
-  if (fs.existsSync(settingsPath)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    } catch {}
-  }
+  const layers = loadSettingsLayers(projectDir);
 
-  // 1. Check if Auto-Memory is enabled or context-mode MCP is configured (8 pts)
+  // 1. Check if Auto-Memory is in use or context-mode MCP is configured (8 pts). Auto-Memory
+  //    is on by default, so being merely enabled earns half: it shows nothing was done.
   const isAutoMemoryDisabledEnv =
     process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY === '1' ||
     process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY === 'true';
-  const isAutoMemoryDisabledSettings = settings?.autoMemoryEnabled === false;
+  const autoMemorySetting = layers.find((layer) => 'autoMemoryEnabled' in layer.settings);
+  const isAutoMemoryDisabledSettings = autoMemorySetting?.settings.autoMemoryEnabled === false;
 
   const mcpConfigPath = path.join(projectDir, '.mcp.json');
   let hasContextModeMCP = false;
@@ -44,12 +41,11 @@ export function auditPillar5(projectDir) {
       description: 'Project is configured with context-mode virtualization for deep episodic tracking.'
     });
   } else if (!isAutoMemoryDisabledEnv && !isAutoMemoryDisabledSettings) {
-    score += 8;
-
     // Check existing project memory dir if present
     const homeDir = os.homedir();
     const projectSlug = path.resolve(projectDir).replace(/\//g, '-');
     const memoryDir = path.join(homeDir, '.claude', 'projects', projectSlug, 'memory');
+    const hasIndex = fs.existsSync(path.join(memoryDir, 'MEMORY.md'));
     let topicCount = 0;
 
     if (fs.existsSync(memoryDir)) {
@@ -59,11 +55,21 @@ export function auditPillar5(projectDir) {
       } catch {}
     }
 
-    findings.push({
-      status: 'pass',
-      title: `Episodic Auto-Memory Active (${topicCount} topic(s) recorded)`,
-      description: 'Two-tier memory captures lessons outside tracked repo files without busting the prompt cache.'
-    });
+    if (hasIndex) {
+      score += 8;
+      findings.push({
+        status: 'pass',
+        title: `Episodic Auto-Memory in Use (${topicCount} topic(s) recorded)`,
+        description: 'Two-tier memory captures lessons outside tracked repo files, so Tier-1 rules stay unchanged.'
+      });
+    } else {
+      score += 4;
+      findings.push({
+        status: 'warn',
+        title: 'Auto-Memory Enabled by Default, Nothing Recorded Yet',
+        description: 'Auto-Memory is on (the Claude Code default) but has no MEMORY.md for this project on this machine yet.'
+      });
+    }
   } else {
     findings.push({
       status: 'warn',
@@ -72,16 +78,13 @@ export function auditPillar5(projectDir) {
     });
   }
 
-  // 2. PreCompact handover hook (7 pts)
-  let hasPreCompactHook = false;
-  if (fs.existsSync(settingsPath)) {
-    try {
-      const rawSettings = fs.readFileSync(settingsPath, 'utf-8');
-      if (rawSettings.includes('pre-compact-handover.sh') || rawSettings.includes('PreCompact')) {
-        hasPreCompactHook = true;
-      }
-    } catch {}
-  }
+  // 2. Compaction handover hook (7 pts): any working PreCompact hook, or a SessionStart hook
+  //    that runs after compaction (matcher `compact`)
+  const compactionHooks = [
+    ...hookCommands(layers, 'PreCompact'),
+    ...hookCommands(layers, 'SessionStart').filter((hook) => /compact/.test(hook.matcher))
+  ];
+  const hasPreCompactHook = compactionHooks.some((hook) => projectScriptStatus(projectDir, hook.command).ok);
 
   if (hasPreCompactHook) {
     score += 7;

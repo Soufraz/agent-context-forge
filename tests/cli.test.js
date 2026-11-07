@@ -15,6 +15,9 @@ import {
   writeToolsGranted
 } from '../src/scanner/pillar4-isolation.js';
 
+// Keep the scanner from reading this machine's ~/.claude settings and memory
+process.env.HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_home_'));
+
 describe('Agent Context Forge CLI & Scanner Suite', () => {
   test('inspectDirectory: correctly classifies empty and populated folders', () => {
     const tmpEmpty = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_empty_'));
@@ -185,6 +188,53 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ntools: Read, Agent\n---\n')), []);
     assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ndisallowedTools: Edit, Write\n---\n')), []);
     assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ntools:\n  - Read\n  - Edit\n---\n')), ['Edit']);
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('auditProject: hook checks need real, working hooks, not filenames in settings.json', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_wiring_'));
+    fs.writeFileSync(path.join(tmpProject, 'CLAUDE.md'), '# Rules\n');
+    const bare = auditProject(tmpProject);
+
+    // Filenames mentioned in settings.json without any hook wired earn nothing
+    fs.mkdirSync(path.join(tmpProject, '.claude'));
+    const settingsPath = path.join(tmpProject, '.claude', 'settings.json');
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify({ note: 'pre-commit-prefix-stability.sh rtk guard-subagent-isolation.py PreCompact' })
+    );
+    assert.equal(auditProject(tmpProject).totalScore, bare.totalScore);
+
+    // A hook wired to a missing script fails and is reported as a dead path
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: 'Read',
+              hooks: [{ type: 'command', command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-subagent-isolation.py"' }]
+            }
+          ]
+        }
+      })
+    );
+    const broken = auditProject(tmpProject);
+    assert.equal(broken.pillars.pillar4.score, bare.pillars.pillar4.score);
+    assert.ok(broken.pillars.pillar4.findings.some((f) => f.status === 'fail' && f.title.includes('Missing Script')));
+    assert.ok(broken.pillars.pillar1.findings.some((f) => f.details?.some((d) => d.includes('guard-subagent-isolation.py'))));
+
+    // rtk's own hook from `rtk init -g` in user settings counts as a rewriter
+    const userClaudeDir = path.join(process.env.HOME, '.claude');
+    fs.mkdirSync(userClaudeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(userClaudeDir, 'settings.json'),
+      JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'rtk hook claude' }] }] } })
+    );
+    const withNativeRtk = auditProject(tmpProject);
+    assert.ok(withNativeRtk.pillars.pillar3.findings.some((f) => f.title === 'Transparent Command Rewriter Configured'));
+    fs.rmSync(userClaudeDir, { recursive: true, force: true });
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { findHook, hookCommands, loadSettingsLayers, projectScriptStatus } from './settings.js';
 
 /**
  * Audits Pillar 1: Prefix Stability
@@ -118,41 +119,48 @@ export function auditPillar1(projectDir) {
     }
   }
 
+  // Hook commands that run a project script which is missing break silently at runtime
+  const layers = loadSettingsLayers(projectDir);
+  const projectLayers = layers.filter((layer) => layer.scope !== 'user');
+  for (const event of new Set(projectLayers.flatMap((layer) => Object.keys(layer.settings.hooks || {})))) {
+    for (const hook of hookCommands(projectLayers, event)) {
+      const status = projectScriptStatus(projectDir, hook.command);
+      if (!status.ok) deadPaths.push(`${status.file} (${event} hook)`);
+    }
+  }
+
   const uniqueDead = [...new Set(deadPaths)];
   if (uniqueDead.length === 0) {
     score += 4;
     findings.push({
       status: 'pass',
       title: 'Valid File Path References',
-      description: 'All local file paths referenced in Tier-1 context exist on disk.'
+      description: 'All local file paths referenced in Tier-1 context, and every hook script, exist on disk.'
     });
   } else {
     findings.push({
       status: 'warn',
       title: `${uniqueDead.length} Dead Path Reference(s) in Tier-1 Context`,
-      description: 'References to missing paths mislead agents into failed read attempts.',
+      description: 'References to missing paths mislead agents into failed read attempts, and hooks pointing at missing scripts never run.',
       details: uniqueDead
     });
   }
 
-  // 5. Pre-commit prefix stability hook check (4 pts)
-  const settingsPath = path.join(projectDir, '.claude', 'settings.json');
-  let hasHook = false;
-  if (fs.existsSync(settingsPath)) {
-    try {
-      const rawSettings = fs.readFileSync(settingsPath, 'utf-8');
-      if (rawSettings.includes('pre-commit-prefix-stability.sh')) {
-        hasHook = true;
-      }
-    } catch {}
-  }
+  // 5. Pre-commit prefix stability hook check (4 pts; checks for this harness's gate)
+  const gate = findHook(projectDir, layers, 'PreToolUse', /pre-commit-prefix-stability\.sh/);
 
-  if (hasHook) {
+  if (gate.working) {
     score += 4;
     findings.push({
       status: 'pass',
       title: 'Pre-Commit Prefix Stability Gate Active',
       description: 'Claude Code PreToolUse hook audits staged context changes before commits.'
+    });
+  } else if (gate.wired) {
+    findings.push({
+      status: 'fail',
+      title: 'Pre-Commit Prefix Stability Gate Points to a Missing Script',
+      description: `The hook is wired but cannot run: ${gate.broken.join(', ')}`
     });
   } else {
     findings.push({

@@ -81,7 +81,8 @@ Instead of reading 400-line files or guessing line numbers via `grep`, coding ag
 2. **Instant Symbol Resolution:** Rather than dumping entire source files into context RAM, the agent queries:
    - **`LSPGoToDefinition`** & **`LSPFindReferences`**: Resolves symbols across files in ~50ms.
    - **`LSPDocumentSymbols`** & **`LSPWorkspaceSymbols`**: Inspects interface shapes and function signatures without loading implementation bodies (~70% token savings).
-3. **`SessionStart` Pre-Flight Doctor:** A non-blocking startup hook (`scripts/agent-gates/check-lsp.sh`) detects the project's language (TypeScript, Python, Go, Rust) and confirms the language server binary (`@vtsls/language-server`, `pyright`, `gopls`, `rust-analyzer`) is present on `PATH`. If missing, it provides copy-paste install commands right in the agent's startup console.
+4. **`SessionStart` Pre-Flight Doctor:** A non-blocking startup hook (`scripts/agent-gates/check-lsp.sh`) detects the project's language (TypeScript, Python, Go, Rust) and confirms the language server binary (`@vtsls/language-server`, `pyright`, `gopls`, `rust-analyzer`) is present on `PATH`. If missing, it provides copy-paste install commands right in the agent's startup console.
+5. **Token-Bomb Read Denials (`permissions.deny`):** `.claude/settings.json` blocks accidental `Read` calls on lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`), build artifacts (`dist/`, `build/`, `.next/`), and minified bundles (`*.min.js`) so a single stray read never dumps 30,000+ tokens into context RAM.
 
 ---
 
@@ -93,9 +94,10 @@ When testing or compiling code, raw terminal output can dump thousands of passin
 Standard terminal truncation is "dumb": it chops characters from the middle or end of output without knowing which lines are errors, frequently discarding the exact stack trace or assertion diff the agent needs.
 
 ### How It Works in This Boilerplate
-1. **Smart Test Compression:** Wrapping test runs with [`rtk`](https://github.com/rtk-ai/rtk) (e.g. `rtk pnpm test`, `rtk pytest`) collapses passing suites into a single line (`✓ 48 passed`) while preserving 100% of failing assertions and stack traces.
-2. **Environment Doctor Hook:** Integrated into `scripts/agent-gates/doctor.sh` and checked on `SessionStart`. If `rtk` is missing, it alerts the developer with installation commands (`cargo install rtk-ai`).
-3. **Noise Stripping:** Automatically removes non-semantic ANSI escape codes and progress spinners before tool outputs reach the agent.
+1. **Transparent Command Rewriting (`PreToolUse` Hook):** `.claude/hooks/rewrite-rtk.sh` automatically intercepts standalone noisy test, build, and git inspection commands (`pytest`, `vitest`, `jest`, `cargo test`, `pnpm test`, `npm test`, `go test`, `git status`, `git diff`, `git log`) and transparently rewrites them to `rtk <cmd>` via Claude Code's `updatedInput` protocol when `rtk` is installed on `PATH`.
+2. **Smart Test Compression:** Wrapping test runs with [`rtk`](https://github.com/rtk-ai/rtk) collapses passing suites into a single line (`✓ 48 passed`) while preserving 100% of failing assertions and stack traces.
+3. **Environment Doctor Hook:** Integrated into `scripts/agent-gates/doctor.sh` and checked on `SessionStart`. If `rtk` is missing, it alerts the developer with installation commands (`cargo install rtk-ai`).
+4. **Noise Stripping:** Automatically removes non-semantic ANSI escape codes and progress spinners before tool outputs reach the agent.
 
 ---
 
@@ -131,7 +133,8 @@ Coding agents shouldn't suffer from amnesia between sessions, but storing past l
    - **`MEMORY.md` Index:** Only the top ~200 lines (~25KB) are loaded at session startup as a lightweight catalog.
    - **Topic Markdown Files:** Detailed debugging findings and user corrections are stored in separate topic files and read lazily on demand.
 2. **Environment Doctor Verification:** `scripts/agent-gates/check-memory.sh` runs automatically on `SessionStart` (via `doctor.sh`), verifying that auto-memory is enabled and reporting how many memory topics are currently active.
-3. **Pluggable Architecture:** While native Auto-Memory is the zero-dependency default, teams with heavy cross-worktree or sandboxed execution needs can easily plug in external MCP memory layers like [`claude-mem`](https://github.com/thedotmack/claude-mem) or [`context-mode`](https://github.com/mksglu/context-mode).
+3. **Lossy Compaction Protection (`PreCompact` Hook):** `.claude/hooks/pre-compact-handover.sh` runs automatically before `/compact` or auto-compaction, snapshotting active Git working state and instructing the compactor to retain exact `file:line` pointers, active test failures, and architectural constraints.
+4. **Pluggable Architecture:** While native Auto-Memory is the zero-dependency default, teams with heavy cross-worktree or sandboxed execution needs can easily plug in external MCP memory layers like [`claude-mem`](https://github.com/thedotmack/claude-mem) or [`context-mode`](https://github.com/mksglu/context-mode).
 
 ---
 
@@ -177,13 +180,17 @@ This boilerplate is designed to be **agent-agnostic**. While the initial hook is
 
 ```
 agent-context-forge/
+├── CLAUDE.md                            # Tier-1 static architectural rules (Claude Code)
+├── AGENTS.md                            # Tier-1 universal agent instructions (OpenCode / Aider)
 ├── .claude/                             # Claude Code Configuration
-│   ├── settings.json                    # SessionStart & PreToolUse hook bindings
+│   ├── settings.json                    # SessionStart, PreToolUse, PreCompact & permissions.deny
 │   ├── agents/
 │   │   └── orchestrator.md              # Tool Permission Scoping template
 │   └── hooks/
 │       ├── pre-commit-prefix-stability.sh  # Pre-commit context audit (Pillar 1)
-│       └── guard-subagent-isolation.py     # Runaway exploration guardrail (Pillar 4)
+│       ├── rewrite-rtk.sh                  # Transparent rtk command rewriter (Pillar 3)
+│       ├── guard-subagent-isolation.py     # Runaway exploration guardrail (Pillar 4)
+│       └── pre-compact-handover.sh         # Lossy compaction protection (Pillar 5)
 │
 ├── .agents/                             # Universal Agent Standard (OpenCode / AGENTS.md)
 │   └── rules/                           # Portable rule definitions
@@ -198,6 +205,10 @@ agent-context-forge/
 │       ├── check-rtk.sh                 # Observation masking check (Pillar 3)
 │       └── check-memory.sh              # Episodic memory verification (Pillar 5)
 │
+├── tests/
+│   └── run-tests.sh                     # Automated self-test suite for all 5 Pillars
+│
+├── LICENSE
 └── README.md
 ```
 
@@ -206,7 +217,7 @@ agent-context-forge/
 | Agent / Environment | Integration Method | Status |
 | :--- | :--- | :--- |
 | **Claude Code** | Native `PreToolUse` hook in `.claude/settings.json` | ✅ Ready |
-| **Universal Git CLI** | Git pre-commit hook in `.githooks/pre-commit` | 🔄 Adaptable |
+| **Universal Git CLI** | Git pre-commit hook in `.githooks/pre-commit` | ✅ Ready |
 | **OpenCode / Aider** | `.agents/` / `AGENTS.md` root standard | 🚧 Roadmap |
 | **Antigravity / Gemini** | `.agents/rules/` + Tool Execution Policy | 🚧 Roadmap |
 | **Cursor / Windsurf** | `.cursor/rules/` + background linters | 🚧 Roadmap |
@@ -217,14 +228,22 @@ agent-context-forge/
 
 1. **Clone or copy this scaffold into your new repository:**
    ```bash
-   git clone https://github.com/your-org/agent-context-forge my-app
+   git clone https://github.com/Soufraz/agent-context-forge my-app
    cd my-app
    ```
 
-2. **Verify the hook is active:**
-   The hook runs automatically inside Claude Code whenever an agent attempts `git commit`.
+2. **Run the self-test & environment doctor:**
+   ```bash
+   ./tests/run-tests.sh
+   ./scripts/agent-gates/doctor.sh
+   ```
 
-3. **Keep Tier 1 Clean:**
+3. **Optional — Enable the Universal Git Pre-Commit Hook (for CLI / IDE commits):**
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+4. **Keep Tier 1 Clean:**
    When adding rules to `CLAUDE.md` or `AGENTS.md`, keep them concise and static. Put active sprint plans in issue trackers or dedicated task files, never in the root prefix!
 
 ---
@@ -232,11 +251,10 @@ agent-context-forge/
 ## 🗺️ Roadmap & Future Solutions
 
 - [x] **Pillar 1:** Universal Prefix Stability & Pre-Commit Hook (Active)
-- [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol (Active)
-- [x] **Pillar 3:** Smart Observation Masking via `rtk` (Active)
+- [x] **Pillar 2:** Progressive Disclosure via Native Language Server Protocol & Token-Bomb Denials (Active)
+- [x] **Pillar 3:** Smart Observation Masking & Transparent `rtk` Rewriting (Active)
 - [x] **Pillar 4:** Subagent Context Isolation & Exploration Guardrails (Active)
-- [x] **Pillar 5:** Episodic Memory via Two-Tier Auto-Memory (Active)
-- [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.
+- [x] **Pillar 5:** Episodic Memory & Lossy Compaction Handover Hook (Active)
 - [ ] **Multi-Agent Adapters:** Out-of-the-box configuration files for OpenCode, Aider, and Antigravity.
 
 ---

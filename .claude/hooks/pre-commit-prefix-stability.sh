@@ -43,7 +43,7 @@ fi
 
 # 4. Prefix Stability & Cache Optimization - LLM Audit
 read -r -d '' PROMPT << 'EOF' || true
-Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, `.claude/skills/`) and the pending changes (`git diff --cached` and `git diff`) against these Prefix Stability & Cache Optimization rules:
+Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, `.claude/skills/`) and the pending changes shown at the end of this prompt against these Prefix Stability & Cache Optimization rules:
 
 1. Tier 1 Immutability & Compactness (`CLAUDE.md` / `AGENTS.md`):
    - Must stay compact (< 150 lines / ~1,000 tokens) and contain only static, project-wide architecture rules, conventions, commands, and on-demand pointers.
@@ -54,7 +54,7 @@ Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/
    - Agent frontmatter must NOT eagerly preload general project-wide stack skills that repeat Tier 1 context.
 
 3. Zero Split-Brain Contradictions:
-   - Instructions across `CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, and `.claude/skills/` must not contradict each other or any architectural changes in `git diff --cached`.
+   - Instructions across `CLAUDE.md`, `AGENTS.md`, `.claude/agents/`, and `.claude/skills/` must not contradict each other or any architectural changes in the pending changes.
 
 4. Valid References:
    - Every file path, directory, and CLI script referenced in context files must exist in the repository.
@@ -62,13 +62,23 @@ Audit this repository's agent context files (`CLAUDE.md`, `AGENTS.md`, `.claude/
 If all rules pass, return {"ok": true, "reason": "Passed"}. If any rule is violated, return {"ok": false, "reason": "<concise list of exact file/line violations to fix before committing>"}.
 EOF
 
+# The pending changes go into the prompt itself, so the audit never needs permission to run git.
+# Staged and unstaged both count: in Claude Code this hook runs before `git add ... && git commit`.
+DIFF="$( { git diff --cached; git diff; } 2>/dev/null | head -c 40000 || true)"
+PROMPT="$PROMPT
+
+Pending changes (git diff --cached, then git diff; cut at 40,000 characters):
+\`\`\`diff
+${DIFF:-(none)}
+\`\`\`"
+
 SCHEMA='{"type":"object","properties":{"ok":{"type":"boolean"},"reason":{"type":"string"}},"required":["ok","reason"]}'
 
 RESULT="$(claude -p "$PROMPT" \
   --model haiku \
   --no-session-persistence \
   --settings '{"hooks":{}}' \
-  --allowedTools "Read,Grep,Glob,Bash(git diff:*)" \
+  --allowedTools "Read,Grep,Glob" \
   --output-format json \
   --json-schema "$SCHEMA" 2>/dev/null || true)"
 

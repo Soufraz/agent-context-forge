@@ -1,0 +1,43 @@
+{
+  "name": "agent-context-forge",
+  "version": "0.1.0",
+  "description": "Interactive CLI scaffold and 5-pillar context quality auditor for AI coding agents",
+  "type": "module",
+  "bin": {
+    "agent-context-forge": "./bin/cli.js",
+    "acf": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    ".claude",
+    ".agents",
+    ".githooks",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node ./bin/cli.js",
+    "test": "node --test tests/cli.test.js && ./tests/run-tests.sh"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "context-engineering",
+    "claude-code",
+    "prompt-caching",
+    "lsp",
+    "rtk",
+    "subagents",
+    "memory"
+  ],
+  "author": "Soufraz",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.9.1",
+    "picocolors": "^1.1.1"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.agent-context-report.html
+/tmp/agent_context_forge/

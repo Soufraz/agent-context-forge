@@ -244,6 +244,28 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
+  test('scaffoldProject: the LSP references rule is opt-in, since it measured +49-51% cost', () => {
+    const lspRule = /`LSP` tool's references lookup/;
+    const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_nolsp_'));
+    scaffoldProject(plain);
+    assert.ok(!lspRule.test(fs.readFileSync(path.join(plain, 'CLAUDE.md'), 'utf-8')));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(plain, '.claude', 'context-forge.json'), 'utf-8')).lsp, 'off');
+    const doctor = execSync(`"${path.join(plain, 'scripts', 'agent-gates', 'check-lsp.sh')}"`, {
+      cwd: plain,
+      encoding: 'utf-8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: plain }
+    });
+    assert.ok(!doctor.includes('⚠️'), 'no LSP warning reaches the session when LSP is off');
+
+    const chosen = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_lsp_on_'));
+    scaffoldProject(chosen, { lsp: 'native' });
+    assert.ok(lspRule.test(fs.readFileSync(path.join(chosen, 'CLAUDE.md'), 'utf-8')));
+    assert.ok(!lspRule.test(generateProjectContext({ projectName: 'X' }).claudeMdContent));
+    assert.ok(!generateProjectContext({ projectName: 'X' }).agentsMdContent.includes('LSP Navigation'));
+    fs.rmSync(plain, { recursive: true, force: true });
+    fs.rmSync(chosen, { recursive: true, force: true });
+  });
+
   test('auditPillar1: dead path check flags missing files, not expressions or generated output', () => {
     const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_deadpaths_'));
     execSync('git init -q', { cwd: tmpProject });

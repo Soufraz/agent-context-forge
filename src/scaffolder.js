@@ -130,7 +130,7 @@ export function mergeSettings(existing, ours) {
 export function scaffoldProject(targetDir, options = {}) {
   const {
     engine = 'claude',
-    lsp = 'native',
+    lsp = 'off',
     masking = 'rtk',
     subagentIsolation = 'guardrail',
     episodicMemory = 'builtin',
@@ -451,7 +451,7 @@ export function scaffoldProject(targetDir, options = {}) {
   } else {
     writeFileWithPerms(
       path.join(targetDir, 'CLAUDE.md'),
-      withAgentsImport(generateStarterClaudeMd({ sdd })),
+      withAgentsImport(generateStarterClaudeMd({ sdd, lsp })),
       false,
       'user'
     );

@@ -8,7 +8,7 @@
 - **Build / Test / Lint:** Run the build, test, and lint scripts the project's package manifest defines rather than ad-hoc commands.
 
 ## 2. Context Engineering & Tool Discipline
-- **Progressive Disclosure (LSP First):** When the `LSP` tool is available (a code intelligence plugin is installed), prefer its symbol queries (`goToDefinition`, `findReferences`, `documentSymbol`, `workspaceSymbol`) over reading entire files when exploring types, interfaces, or call sites.
+- **Progressive Disclosure:** Search with `grep`/`rg` and read line ranges instead of whole files. Use the `LSP` tool's symbol queries only when the project opted into code intelligence (a plugin is installed) and the question needs exact call sites.
 - **Observation Masking (`rtk`):** A PreToolUse hook rewrites test, build, and git commands through `rtk` when it is installed, so run them normally; recover trimmed output with `rtk recall <hash>` when needed.
 - **Token-Bomb Avoidance:** Never read lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`), build artifacts (`dist/`, `build/`, `.next/`), or minified bundles into context.
 - **Subagent Context Isolation:** Keep the primary session context flat. If an investigation requires 15+ exploratory `Read`, `Grep`, or `Glob` calls, delegate the exploration to a fresh subagent (`Agent` tool) and return only a concise synthesis with exact `file:line` pointers.

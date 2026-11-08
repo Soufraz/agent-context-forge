@@ -38,8 +38,10 @@ export function buildSddSection(sdd) {
   return '';
 }
 
-// The one navigation rule with evidence behind it: LSP references are more precise than text
-// search when names collide or imports are aliased. Models rarely pick LSP on their own.
+// Opt-in: LSP references are more precise than text search when names collide or imports are
+// aliased, and models rarely pick LSP on their own. With this rule Sonnet found every caller in
+// 2 of 6 runs (0 of 6 without), but the runs cost 49-51% more (benchmarks round 4), so the
+// starter leaves it out unless the user chooses LSP navigation.
 const LSP_REFERENCES_RULE =
   "- To find who calls a function or where a symbol is used, prefer the `LSP` tool's references lookup when it is available (load it with ToolSearch if it isn't listed): text search conflates same-named symbols and misses aliased imports.";
 const LOCKFILE_RULE = '- Search lockfiles with `grep -n` instead of reading them whole.';
@@ -55,8 +57,9 @@ conventions it can't infer from the code), and leave out task lists, issue numbe
  * The starter CLAUDE.md for projects installed without custom context. Rules that hooks enforce
  * or that Claude Code handles itself are left out, since every line costs tokens on every turn.
  */
-export function generateStarterClaudeMd({ sdd = 'none' } = {}) {
-  return [MAINTAINER_NOTE, '# Project Instructions', '', LSP_REFERENCES_RULE, LOCKFILE_RULE, buildSddSection(sdd)]
+export function generateStarterClaudeMd({ sdd = 'none', lsp = 'off' } = {}) {
+  const lspRule = lsp === 'native' ? LSP_REFERENCES_RULE : '';
+  return [MAINTAINER_NOTE, '# Project Instructions', '', lspRule, LOCKFILE_RULE, buildSddSection(sdd)]
     .filter((part) => part !== '')
     .join('\n')
     .replace('# Project Instructions\n', '# Project Instructions\n\n') + '\n';
@@ -69,7 +72,7 @@ export function generateProjectContext(options = {}) {
     techStack = 'TypeScript / Node.js',
     customRules = '',
     sdd = 'none',
-    lsp = 'native',
+    lsp = 'off',
     masking = 'rtk',
     episodicMemory = 'builtin'
   } = options;
@@ -81,7 +84,9 @@ export function generateProjectContext(options = {}) {
   const toolNotes = [
     lsp === 'native'
       ? LSP_REFERENCES_RULE
-      : `- Navigate symbols with ${typeof lsp === 'object' && lsp.custom ? lsp.custom : 'the configured code intelligence tool'}.`,
+      : typeof lsp === 'object' && lsp.custom
+      ? `- Navigate symbols with ${lsp.custom}.`
+      : '',
     LOCKFILE_RULE,
     masking === 'rtk'
       ? ''
@@ -116,10 +121,14 @@ export function generateProjectContext(options = {}) {
 - **Pre-flight Doctor:** \`./scripts/agent-gates/doctor.sh\`
 
 ## 2. Universal Agent Laws
-1. **LSP Navigation:** Prefer symbol navigation tools over full-file reads.
-2. **Output Compression:** Use command compressors (\`rtk\`) for tests to prevent context RAM flooding.
-3. **Subagent Delegation:** Offload deep research to isolated child agents.
-4. **Architectural Deep-Dive:** See \`.agents/rules/project-architecture.md\` for domain rules.
+${[
+  lsp === 'native' ? '**LSP Navigation:** Prefer symbol navigation tools over full-file reads.' : '',
+  '**Subagent Delegation:** Offload deep research to isolated child agents.',
+  '**Architectural Deep-Dive:** See `.agents/rules/project-architecture.md` for domain rules.'
+]
+  .filter(Boolean)
+  .map((law, i) => `${i + 1}. ${law}`)
+  .join('\n')}
 `;
 
   const architectureRuleContent = `# ${projectName} — Architectural Rules & Domain Guidelines

@@ -25,8 +25,9 @@ export function isCommandAvailable(cmd) {
  * and interactively offers to install them for the user.
  *
  * @param {string} targetDir Project root directory
+ * @param {{lsp?: boolean}} [options] `lsp: false` skips the language server and plugin offers
  */
-export async function offerToolInstallations(targetDir) {
+export async function offerToolInstallations(targetDir, { lsp = true } = {}) {
   const dirInfo = inspectDirectory(targetDir);
 
   const hasRtk = isCommandAvailable('rtk');
@@ -64,9 +65,10 @@ export async function offerToolInstallations(targetDir) {
 
   // 2. Offer to install each language server, then point to its code intelligence plugin:
   //    Claude Code keeps its LSP tool off until the plugin is installed.
+  //    Skipped when the user left LSP off (the default).
   const layers = loadSettingsLayers(targetDir);
   const installed = installedPluginsFor(targetDir);
-  for (const server of lspPluginsFor(dirInfo.projectTypes)) {
+  for (const server of lsp ? lspPluginsFor(dirInfo.projectTypes) : []) {
     if (!isCommandAvailable(server.binary) || (server.needsTsserver && !tsserverAvailable(targetDir))) {
       if (server.install.startsWith('npm ') && hasNpm) {
         const installLsp = await p.confirm({

@@ -31,7 +31,7 @@ npx agent-context-forge
 </p>
 
 * **In an existing codebase:** Audits your repository across the 5 Pillars of Context Engineering in `< 2 seconds` and opens a self-contained, dark-mode **HTML Context Health Dashboard** in your browser, or installs the setup there.
-* **In an empty folder (or when installing):** Launches an interactive stack wizard to configure native LSP symbol navigation, [`rtk`](https://github.com/rtk-ai/rtk) test output compression, an exploration note, episodic memory, and optional SDD rules.
+* **In an empty folder (or when installing):** Launches an interactive stack wizard to configure opt-in LSP symbol navigation, [`rtk`](https://github.com/rtk-ai/rtk) test output compression, an exploration note, episodic memory, and optional SDD rules.
 
 ---
 
@@ -39,14 +39,14 @@ npx agent-context-forge
 
 ### 1. Sets up the tools
 
-`npx agent-context-forge` asks a few questions and writes the setup into a new or existing repo: a lean `CLAUDE.md` that imports your `AGENTS.md`, [`rtk`](https://github.com/rtk-ai/rtk) to compress Bash output, stable project facts at session start (how this project runs its tests, BSD `sed`), a guard on whole-file reads of lockfiles and bundles, a note that suggests a subagent during long searches, Auto-Memory checks with a compaction handover, and an optional planning methodology. It offers to install `rtk` and your language server, and points you to Claude Code's code intelligence (LSP) plugin for your language.
+`npx agent-context-forge` asks a few questions and writes the setup into a new or existing repo: a lean `CLAUDE.md` that imports your `AGENTS.md`, [`rtk`](https://github.com/rtk-ai/rtk) to compress Bash output, stable project facts at session start (how this project runs its tests, BSD `sed`), a guard on whole-file reads of lockfiles and bundles, a note that suggests a subagent during long searches, Auto-Memory checks with a compaction handover, and an optional planning methodology. It offers to install `rtk`. LSP navigation (a language server, Claude Code's code intelligence plugin and a references rule in `CLAUDE.md`) is opt-in, because it cost more in every measured run.
 
 **Measured** in paired runs on real repos (6 pairs per task, 0.2.1 harness):
 - **Tool output:** 14–25% less on the click tasks (fixing failing tests on Sonnet and Haiku, a six-prompt session on Sonnet).
 - **Fewer wasted turns:** on Sonnet, the project facts removed every failed attempt to find the test command.
 - **No clear cost saving on any task:** cost changes ranged from −9% to +6%, each with a 90% interval that includes zero.
 - **Higher cost where there is little to save:** +22% on a one-question lockfile task.
-- **The LSP references rule:** +49% on Sonnet, where it gave the only exact answers (2 of 6 runs), and +51% on Haiku, with no gain.
+- **The LSP references rule:** +49% on Sonnet, where it gave the only exact answers (2 of 6 runs), and +51% on Haiku, with no gain. It is now opt-in: the default setup leaves it out.
 
 An earlier round reported 10–35% savings; a benchmark bug inflated them. Tables with 90% confidence intervals, the tasks and graders, every run, and the bug: [benchmarks/](benchmarks/README.md).
 
@@ -122,13 +122,13 @@ Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-rep
 
 ### 2. Modular Stack Configurator (`Install` Mode)
 Lets you customize each layer instead of forcing a rigid template:
-* **Progressive Disclosure:** Claude Native LSP *(default)* or bring your own code-intelligence MCP/tool.
+* **Progressive Disclosure:** text search *(default)*, Claude Native LSP *(opt-in)*, or bring your own code-intelligence MCP/tool.
 * **Observation Masking:** [`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) *(default)* or custom output filter.
 * **Subagent Isolation:** Exploration Guardrail note after 15 consecutive searches *(default)*, Orchestrator Tool Permission Scoping (`.claude/agents/orchestrator.md`, whose `tools` allowlist leaves out `Edit`/`Write`), or both.
 * **Episodic Memory:** Built-in Claude Auto-Memory *(default, zero setup)* or [`context-mode`](https://github.com/mksglu/context-mode) *(sandboxed FTS5/BM25 MCP virtualization)*.
 * **SDD Pairing (Optional):** Pre-wires rules for [Superpowers SDD](https://github.com/obra/superpowers), [GetShitDone (GSD)](https://github.com/open-gsd/gsd-core), [ECC](https://github.com/affaan-m/everything-claude-code), or the [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model).
 * **Custom Context Bootstrapping (Optional):** Describe what you're building right in the CLI to generate a tailored, prefix-stable `CLAUDE.md`, `AGENTS.md`, and `.agents/rules/project-architecture.md`.
-* **Lean `CLAUDE.md`:** The `CLAUDE.md` the harness writes holds only rules that change how Claude works (your stack and constraints, a references rule for the LSP tool, and grepping lockfiles), because every line is sent with every request. Guidance for you sits in an HTML comment, which Claude Code strips before loading the file. When your repo already has an `AGENTS.md`, the new `CLAUDE.md` imports it with `@AGENTS.md`, since Claude Code reads only `CLAUDE.md` when both exist.
+* **Lean `CLAUDE.md`:** The `CLAUDE.md` the harness writes holds only rules that change how Claude works (your stack and constraints, a references rule for the LSP tool when you choose LSP, and grepping lockfiles), because every line is sent with every request. Guidance for you sits in an HTML comment, which Claude Code strips before loading the file. When your repo already has an `AGENTS.md`, the new `CLAUDE.md` imports it with `@AGENTS.md`, since Claude Code reads only `CLAUDE.md` when both exist.
 * **Safe on existing repos:** Install never discards your configuration. `.claude/settings.json` is merged (your permissions and hooks are kept, and a `.bak` copy is saved first). Your `CLAUDE.md`, `AGENTS.md`, agents, rules, and git hooks are replaced only while they are unchanged since the last install. Once you have edited one (or wrote it yourself), it is kept, and the harness version is written next to it as `<file>.context-forge-new` for you to merge.
 
 ---
@@ -151,7 +151,7 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 ### Pillar 2: Progressive Disclosure via LSP & Whole-File Read Guard
 * **Files:** [`.claude/hooks/guard-whole-file-reads.sh`](.claude/hooks/guard-whole-file-reads.sh) + [`scripts/agent-gates/check-lsp.sh`](scripts/agent-gates/check-lsp.sh)
 * **Mechanism:** Claude Code's `LSP` tool (go to definition, find references, diagnostics after edits) stays off until you install a [code intelligence plugin](https://code.claude.com/docs/en/plugins/code-intelligence) for your language, and a language server on `PATH` is not enough on its own. The doctor and scanner check that the plugin is installed for the project folder (e.g. `claude plugin install typescript-lsp@claude-plugins-official`), not just enabled in settings, and that the binary it starts can run. For TypeScript that means `npm install -g typescript-language-server typescript@6`: TypeScript 7 no longer ships the `tsserver.js` the server needs.
-* **References rule:** The generated `CLAUDE.md` asks Claude to use the `LSP` tool's references lookup for "who calls X" questions. Left to itself, Claude almost always reaches for grep, which conflates same-named symbols and misses aliased imports.
+* **References rule (opt-in):** When you choose LSP navigation, the generated `CLAUDE.md` asks Claude to use the `LSP` tool's references lookup for "who calls X" questions. Left to itself, Claude almost always reaches for grep, which conflates same-named symbols and misses aliased imports. It is off by default: it gave the only exact answers on Sonnet (2 of 6 runs) but cost 49–51% more.
 * **Whole-File Read Guard:** A `PreToolUse` hook on `Read` blocks reading lockfiles, minified bundles, and source maps whole, and tells Claude to grep them or read a range instead. It replaces `permissions.deny` Read rules, which also block every Grep and `grep` of those files and made agents fail questions like "which version is locked". Upgrading from v0.1 removes the deny rules it added.
 
 ### Pillar 3: Transparent Observation Masking (`rtk`)

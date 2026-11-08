@@ -10,6 +10,13 @@ set -euo pipefail
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$PROJECT_ROOT"
 
+# LSP navigation is opt-in: a project installed without it gets no warning about missing parts
+INSTALLED_LSP="$(jq -r '.lsp // empty' .claude/context-forge.json 2>/dev/null || true)"
+if [ -n "$INSTALLED_LSP" ] && [ "$INSTALLED_LSP" != "native" ]; then
+  printf '· [LSP Code Intelligence]: off (opt-in; it costs more on most tasks). Choose it in the installer to turn it on.\n'
+  exit 0
+fi
+
 DETECTED_LANG=""
 PLUGIN=""
 BINARY=""

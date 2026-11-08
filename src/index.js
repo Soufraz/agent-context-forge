@@ -226,9 +226,14 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     message: '[Pillar 2] Progressive Disclosure (Code Intelligence):',
     options: [
       {
+        value: 'off',
+        label: 'Text search (Default)',
+        hint: 'Adds nothing: Claude Code searches with grep and reads line ranges'
+      },
+      {
         value: 'native',
-        label: 'Claude Native LSP (Default, recommended)',
-        hint: 'Compiler-backed symbol navigation via a code intelligence plugin'
+        label: 'Claude Native LSP (opt-in)',
+        hint: 'Exact callers on large typed codebases; measured +49-51% cost on that task'
       },
       {
         value: 'custom',
@@ -239,7 +244,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
   });
   if (p.isCancel(lspChoice)) process.exit(0);
 
-  let lsp = 'native';
+  let lsp = lspChoice;
   if (lspChoice === 'custom') {
     const customTool = await p.text({
       message: 'Enter the name of your code intelligence tool/MCP:',
@@ -432,8 +437,8 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     } catch {}
   }
 
-  // Interactively offer to install missing tools (rtk, language server)
-  await offerToolInstallations(targetDir);
+  // Interactively offer to install missing tools (rtk, and a language server when LSP was chosen)
+  await offerToolInstallations(targetDir, { lsp: lsp === 'native' });
 
   p.note(
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +

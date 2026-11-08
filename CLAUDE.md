@@ -19,6 +19,7 @@
 - `scripts/agent-gates/` — Portable environment health checks for LSP, `rtk`, and Episodic Auto-Memory.
 - `.agents/rules/` — Portable cross-agent rule definitions.
 - `.githooks/` — Standard Git hook wrappers for CLI and IDE commits.
+- `benchmarks/` — Published evidence behind README claims: method, tasks, paired results, per-run data.
 
 ## 4. Coding & Commit Standards
 - Write small, focused commits with clear commit messages (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`).

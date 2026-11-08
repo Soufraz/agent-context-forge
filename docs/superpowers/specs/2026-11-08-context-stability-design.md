@@ -9,7 +9,7 @@ through one and three compactions (Sonnet; Haiku slipped once in 10 test runs), 
 stale CLAUDE.md lines when the evidence sat beside the edit. The user chose to position the
 project on **guarantees and drift** instead: checkable rules enforced by hooks, context files kept
 true to the code, and measured cost. The commit-time drift check (Part C) was built next; replayed
-over 4,269 commits with context files it fired once, on a real rename that left pydantic-ai's
+over 4,262 commits with context files it fired once, on a real rename that left pydantic-ai's
 CLAUDE.md wrong for 37 commits. Rule capture (B2) stays as a safeguard for long sessions, with no
 claimed gain.
 

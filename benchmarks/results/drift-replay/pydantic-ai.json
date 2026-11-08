@@ -1,0 +1,23 @@
+{
+ "repo": "pydantic-ai",
+ "commits": 4956,
+ "commits_with_context_files": 4054,
+ "hits": 1,
+ "fixed": 1,
+ "still_stale_at_head": 0,
+ "details": [
+  {
+   "commit": "574540234f",
+   "index": 977,
+   "subject": "Add AbstractAgent, WrapperAgent, Agent.event_stream_handler, Toolset.id, Agent.override(tools=...) i",
+   "file": "CLAUDE.md",
+   "ref": "pydantic_ai_slim/pydantic_ai/agent.py",
+   "renamed_to": [
+    "pydantic_ai_slim/pydantic_ai/agent/__init__.py"
+   ],
+   "context_changed_in_same_commit": false,
+   "fixed_at_index": 1014,
+   "fixed_after_commits": 37
+  }
+ ]
+}

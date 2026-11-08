@@ -1,0 +1,97 @@
+benchmark,model,condition,rep,correct,finished,cost_usd,turns,duration_s,start_context_tokens,peak_context_tokens,output_tokens,cache_write_tokens,cache_read_tokens,all_tokens,tool_output_chars,tool_calls,rtk_rewrites,read_guard_denials,guardrail_notes,compactions
+01-lockfile-tanstack-query,sonnet,baseline,1,true,true,0.055524,7,17,18417,20560,968,8251,128116,137349,2248,Bash:6,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,1,true,true,0.058119,6,19,18988,21419,1043,9110,112254,122419,2556,Bash:5,4,0,0,0
+01-lockfile-tanstack-query,sonnet,baseline,2,true,true,0.045040,7,14,18417,20486,972,5565,130324,136875,2077,Bash:6,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,2,true,true,0.055530,6,14,18988,21387,796,9078,112342,122228,2912,Bash:5,4,0,0,0
+01-lockfile-tanstack-query,sonnet,baseline,3,true,true,0.042118,6,13,18417,20314,942,5393,111024,117371,2110,Bash:5,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,3,true,true,0.055321,6,15,18988,21247,841,8938,111354,121145,2839,Bash:5,4,0,0,0
+01-lockfile-tanstack-query,sonnet,baseline,4,true,true,0.042759,6,15,18417,20523,924,5602,110867,117405,2560,Bash:5,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,4,true,true,0.061567,7,17,18988,21308,1235,8999,131932,142180,2257,Bash:6,4,0,0,0
+01-lockfile-tanstack-query,sonnet,baseline,5,true,true,0.055015,6,14,18417,20584,1099,8275,109014,118400,2010,Bash:5,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,5,true,true,0.055180,5,14,18988,21119,1080,8810,91195,101095,2102,Bash:4,4,0,0,0
+01-lockfile-tanstack-query,sonnet,baseline,6,true,true,0.041813,6,12,18417,20595,793,5674,111626,118105,2584,Bash:5,0,0,0,0
+01-lockfile-tanstack-query,sonnet,harness,6,true,true,0.056972,7,16,18988,21074,879,8765,130940,140598,2143,Bash:6,4,0,0,0
+02-test-output-click,sonnet,baseline,1,false,true,0.078187,11,38,18390,23478,1578,11168,176989,189753,8644,Bash:7 Edit:2 Read:1,0,0,0,0
+02-test-output-click,sonnet,harness,1,true,true,0.054582,5,28,18697,21650,805,9340,91516,101671,5902,Bash:4,4,0,0,0
+02-test-output-click,sonnet,baseline,2,true,true,0.055993,8,59,18390,22499,1234,7599,132286,141133,7909,Bash:5 Read:1 Edit:1,0,0,0,0
+02-test-output-click,sonnet,harness,2,true,true,0.057040,5,26,18697,22156,841,9846,92262,102959,7472,Bash:4,2,0,0,0
+02-test-output-click,sonnet,baseline,3,true,true,0.051490,8,26,18390,21749,1078,6849,132860,140801,7386,Bash:5 Read:1 Edit:1,0,0,0,0
+02-test-output-click,sonnet,harness,3,true,true,0.053046,5,21,18697,21116,872,8806,90823,100511,4539,Bash:4,3,0,0,0
+02-test-output-click,sonnet,baseline,4,true,true,0.064253,9,36,18390,23906,1252,9006,156766,167040,10426,Bash:7 Edit:1,0,0,0,0
+02-test-output-click,sonnet,harness,4,true,true,0.054903,6,23,18697,21548,883,9238,91006,101137,5096,Bash:4 Edit:1,4,0,0,0
+02-test-output-click,sonnet,baseline,5,true,true,0.063761,8,28,18390,22302,1054,9992,132254,143314,8859,Bash:6 Edit:1,0,0,0,0
+02-test-output-click,sonnet,harness,5,true,true,0.054300,6,22,18697,21585,801,9275,91697,101783,5489,Bash:4 Edit:1,2,0,0,0
+02-test-output-click,sonnet,baseline,6,true,true,0.060132,9,34,18390,23133,1172,8233,154478,163899,9236,Bash:7 Edit:1,0,0,0,0
+02-test-output-click,sonnet,harness,6,true,true,0.056378,6,26,18697,21788,933,9478,91159,101580,5711,Bash:4 Edit:1,3,0,0,0
+02-test-output-click,haiku,baseline,1,true,true,0.009493,2,5,19212,31418,4849,20188,302826,327887,15422,Bash:11 Edit:1,0,0,0,0
+02-test-output-click,haiku,harness,1,true,true,0.004736,6,27,19518,26373,2060,13260,105271,120601,10857,Bash:4 Edit:1,3,0,0,0
+02-test-output-click,haiku,baseline,2,true,true,0.010904,2,4,19212,34617,4883,18915,467589,491421,21755,Bash:14 Edit:1,0,0,0,0
+02-test-output-click,haiku,harness,2,true,true,0.014882,2,4,19518,37961,7196,24848,631027,663113,18483,Bash:15 Edit:1 Monitor:3,11,0,0,0
+02-test-output-click,haiku,baseline,3,true,true,0.011093,18,769,19212,34589,5729,18887,444810,469458,19213,Bash:16 Edit:1,0,0,0,0
+02-test-output-click,haiku,harness,3,true,true,0.005593,9,31,19518,26730,2667,13617,153463,169761,9956,Bash:6 Read:1 Edit:1,5,0,0,0
+02-test-output-click,haiku,baseline,4,true,true,0.009242,2,4,19212,31442,4534,15740,382355,402659,15639,Bash:12 Edit:1,0,0,0,0
+02-test-output-click,haiku,harness,4,true,true,0.005297,6,28,19518,28549,2279,15436,106936,124661,15828,Bash:4 Edit:1,4,0,0,0
+02-test-output-click,haiku,baseline,5,true,true,0.013481,2,4,19212,36690,5691,23577,591615,620923,23658,Bash:14 Edit:1 Monitor:1 ScheduleWakeup:3,0,0,0,0
+02-test-output-click,haiku,harness,5,true,true,0.005142,8,29,19518,26441,2437,13328,125651,141428,10631,Bash:6 Edit:1,6,0,0,0
+02-test-output-click,haiku,baseline,6,true,true,0.010371,1,2,19212,35921,5151,20219,374929,400327,18131,Bash:10 Edit:1 ToolSearch:1 Monitor:1,0,0,0,0
+02-test-output-click,haiku,harness,6,true,true,0.005812,10,30,19518,26996,2592,13883,173736,190227,11047,Bash:7 Read:1 Edit:1,5,0,0,0
+03-exploration-gin,sonnet,baseline,1,true,true,0.131538,8,36,18467,30329,4868,18019,107622,130519,24207,Bash:3 Read:4,0,0,0,0
+03-exploration-gin,sonnet,harness,1,true,true,0.129024,8,36,18768,29917,4776,17607,108165,130558,22806,Bash:3 Read:4,2,0,0,0
+03-exploration-gin,sonnet,baseline,2,true,true,0.163874,6,34,18777,27992,4284,27990,90544,122828,18796,Bash:5,0,0,0,0
+03-exploration-gin,sonnet,harness,2,true,true,0.125445,7,36,18768,29517,4648,17207,101169,123034,21680,Bash:3 Read:3,3,0,0,0
+03-exploration-gin,sonnet,baseline,3,true,true,0.130476,11,38,18777,31454,5185,16168,139300,160665,24256,Bash:4 Read:6,0,0,0,0
+03-exploration-gin,sonnet,harness,3,true,true,0.117368,7,36,18768,28208,4605,15898,77096,97607,18092,Bash:3 Read:3,3,0,0,0
+03-exploration-gin,sonnet,baseline,4,true,true,0.131209,9,40,18467,28713,5277,16403,128034,149726,18880,Bash:4 Read:4,0,0,0,0
+03-exploration-gin,sonnet,harness,4,true,true,0.098797,8,29,18768,25204,3966,12894,75447,92315,11229,Bash:2 Read:5,2,0,0,0
+03-exploration-gin,sonnet,baseline,5,true,true,0.129923,7,35,18777,29982,4824,18442,78991,102265,23435,Bash:2 Read:4,0,0,0,0
+03-exploration-gin,sonnet,harness,5,true,true,0.127558,8,34,19078,30422,4524,17802,110899,133235,23359,Bash:3 Read:4,2,0,0,0
+03-exploration-gin,sonnet,baseline,6,true,true,0.143680,8,40,18467,31238,5706,18928,108879,133523,26044,Bash:3 Read:4,0,0,0,0
+03-exploration-gin,sonnet,harness,6,true,true,0.128074,8,38,18768,28995,4830,16685,130099,151626,19628,Bash:4 Read:3,2,0,0,0
+04-lsp-date-fns,sonnet,baseline,1,false,true,0.059526,5,16,18457,21355,1420,9046,91224,101700,4000,Bash:4,0,0,0,0
+04-lsp-date-fns,sonnet,harness,1,true,true,0.084803,7,23,19302,24476,2436,12167,117507,132122,5174,ToolSearch:1 Bash:3 LSP:2,2,0,0,0
+04-lsp-date-fns,sonnet,baseline,2,false,true,0.054993,4,17,18457,22011,1945,7047,73393,82393,5191,Bash:3,0,0,0,0
+04-lsp-date-fns,sonnet,harness,2,true,true,0.080003,8,22,19302,24181,1845,11872,140367,154098,5174,ToolSearch:1 Bash:5 LSP:1,3,0,0,0
+04-lsp-date-fns,sonnet,baseline,3,false,true,0.054238,4,16,18457,21852,1937,6888,72999,81832,5080,Bash:3,0,0,0,0
+04-lsp-date-fns,sonnet,harness,3,false,true,0.089752,7,23,19302,25484,2508,13175,119481,135176,7677,ToolSearch:1 Bash:3 LSP:2,3,0,0,0
+04-lsp-date-fns,sonnet,baseline,4,false,true,0.054070,5,14,18457,22459,1461,7495,94597,103563,5600,Bash:4,0,0,0,0
+04-lsp-date-fns,sonnet,harness,4,false,true,0.086219,7,22,19302,24822,2427,12513,118729,133681,6233,ToolSearch:1 Bash:4 LSP:1,3,0,0,0
+04-lsp-date-fns,sonnet,baseline,5,false,true,0.068050,5,16,18457,22608,1762,10299,92137,104208,5654,Bash:4,0,0,0,0
+04-lsp-date-fns,sonnet,harness,5,true,true,0.085333,8,23,19302,23851,2509,11542,140470,154535,3214,ToolSearch:1 Bash:5 LSP:1,3,0,0,0
+04-lsp-date-fns,sonnet,baseline,6,false,true,0.053346,5,14,18457,22506,1364,7542,95177,104093,5649,Bash:4,0,0,0,0
+04-lsp-date-fns,sonnet,harness,6,false,true,0.083803,7,23,19302,24138,2471,11829,117533,131845,4550,ToolSearch:1 Bash:4 LSP:1,4,0,0,0
+04-lsp-date-fns,haiku,baseline,1,false,true,0.004481,4,16,19280,25259,2607,12146,74755,89516,9191,Bash:3,0,0,0,0
+04-lsp-date-fns,haiku,harness,1,false,true,0.007258,9,29,20122,28636,4950,17407,130066,152435,7623,ToolSearch:1 Bash:4 Read:2 LSP:1,4,0,0,0
+04-lsp-date-fns,haiku,baseline,2,false,true,0.005808,5,22,19279,26984,4088,13872,98892,116862,10822,Bash:4,0,0,0,0
+04-lsp-date-fns,haiku,harness,2,false,true,0.005220,7,20,20122,25364,3062,12252,123702,139028,4882,ToolSearch:1 Bash:2 Read:2 LSP:1,2,0,0,0
+04-lsp-date-fns,haiku,baseline,3,false,true,0.004458,5,19,19279,25046,3174,9280,101383,113847,7341,Bash:4,0,0,0,0
+04-lsp-date-fns,haiku,harness,3,false,true,0.005052,6,19,20122,26222,3277,13110,79086,95481,6479,ToolSearch:1 Bash:3 LSP:1,3,0,0,0
+04-lsp-date-fns,haiku,baseline,4,false,true,0.004300,4,17,19279,25451,3185,9685,77005,89883,9247,Bash:3,0,0,0,0
+04-lsp-date-fns,haiku,harness,4,false,true,0.006280,7,24,20122,27691,4632,14579,104732,123953,7557,ToolSearch:1 Bash:4 LSP:1,3,0,0,0
+04-lsp-date-fns,haiku,baseline,5,false,true,0.005054,4,17,19279,24857,3207,13628,72455,89298,8249,Bash:3,0,0,0,0
+04-lsp-date-fns,haiku,harness,5,false,true,0.005713,7,22,20122,26264,3690,13152,123643,140497,5763,ToolSearch:1 Bash:4 LSP:1,4,0,0,0
+04-lsp-date-fns,haiku,baseline,6,false,true,0.005232,6,22,19279,26771,3604,11005,122793,137414,8730,Bash:5,0,0,0,0
+04-lsp-date-fns,haiku,harness,6,false,true,0.005307,6,20,20122,25885,3415,12773,104374,120572,5652,ToolSearch:1 Bash:3 LSP:1,3,0,0,0
+07-long-session-click,sonnet,baseline,1,true,true,0.223806,2,16,18446,39593,6816,24637,570176,601669,30943,Bash:14 Edit:1,0,0,0,0
+07-long-session-click,sonnet,harness,1,true,true,0.240007,2,15,18753,39623,7402,27312,566588,601342,28439,Bash:15 Edit:2,11,0,0,0
+07-long-session-click,sonnet,baseline,2,true,true,0.243543,2,11,18446,39894,7899,27583,541452,576972,32308,Bash:12 Edit:2,0,0,0,0
+07-long-session-click,sonnet,harness,2,true,true,0.231750,3,18,18753,38249,6819,25938,597242,630041,25174,Bash:17 Edit:1,11,0,0,0
+07-long-session-click,sonnet,baseline,3,true,true,0.194509,2,11,18446,36556,6188,21600,461607,489429,27226,Bash:11,0,0,0,0
+07-long-session-click,sonnet,harness,3,true,true,0.217012,2,10,18753,37276,6743,24965,496504,528248,25226,Bash:13 Edit:2 ToolSearch:1,9,0,0,0
+07-long-session-click,sonnet,baseline,4,true,true,0.202747,2,11,18446,36383,6284,21427,541192,568943,23703,Bash:14 Edit:1,0,0,0,0
+07-long-session-click,sonnet,harness,4,true,true,0.254958,2,11,18753,40997,7833,28686,618003,654564,32401,Bash:15 Edit:2,10,0,0,0
+07-long-session-click,sonnet,baseline,5,true,true,0.224765,2,10,18446,40259,6237,29028,462188,497485,36641,Bash:11 Edit:1,0,0,0,0
+07-long-session-click,sonnet,harness,5,true,true,0.212040,2,11,18753,37221,6544,24910,468919,500407,28124,Bash:12,6,0,0,0
+07-long-session-click,sonnet,baseline,6,true,true,0.212604,2,10,18446,38902,6292,23946,538243,568519,31526,Bash:14 Edit:1,0,0,0,0
+07-long-session-click,sonnet,harness,6,true,true,0.175228,2,11,18753,32496,5738,20185,370481,396434,16337,Bash:9,6,0,0,0
+07-long-session-click,haiku,baseline,1,true,true,0.034855,2,11,19268,96735,16386,85504,955670,1057604,146912,Bash:15 Edit:2 Read:2,0,0,0,0
+07-long-session-click,haiku,harness,1,true,true,0.024562,2,11,19574,55283,14858,42169,869479,926552,43527,Bash:18 Read:3 Edit:2,15,0,0,0
+07-long-session-click,haiku,baseline,2,true,true,0.026727,2,10,19268,64929,13590,49171,1009267,1072078,76881,Bash:20 Edit:2,0,0,0,0
+07-long-session-click,haiku,harness,2,true,true,0.027257,2,10,19574,59731,14257,46617,1079961,1140889,55433,Bash:22 Edit:2,11,0,0,0
+07-long-session-click,haiku,baseline,3,true,true,0.033905,7,18,19268,72900,15509,57142,1471479,1544200,89584,Bash:28 Edit:2 Monitor:5,0,0,0,0
+07-long-session-click,haiku,harness,3,true,true,0.022336,2,10,19574,53614,13372,40500,754602,808516,44302,Bash:16 Edit:2,14,0,0,0
+07-long-session-click,haiku,baseline,4,true,true,0.031426,6,1053,19268,63042,17069,47284,1342873,1407290,60326,Bash:28 Edit:2,0,0,0,0
+07-long-session-click,haiku,harness,4,true,true,0.026842,2,11,19574,70124,14290,57010,829056,900396,85940,Bash:16 Edit:2,12,0,0,0
+07-long-session-click,haiku,baseline,5,true,true,0.029146,2,11,19268,73827,13971,60713,1001224,1075960,99708,Bash:19 Edit:2 Read:1,0,0,0,0
+07-long-session-click,haiku,harness,5,true,true,0.034491,2,12,19574,88525,15280,75411,1176343,1267086,126623,Bash:17 Read:3 Edit:2 ToolSearch:1,14,0,0,0
+07-long-session-click,haiku,baseline,6,true,true,0.018281,2,10,19268,48382,11717,32624,589417,633794,38462,Bash:12 Edit:2,0,0,0,0
+07-long-session-click,haiku,harness,6,true,true,0.021591,2,10,19574,51734,12448,38620,763907,815017,40830,Bash:17 Edit:2,15,0,0,0

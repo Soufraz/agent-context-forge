@@ -1,11 +1,11 @@
 > [!NOTE]
-> **What is measured so far.** The cost numbers come from 6 paired runs per task on the previous harness (v2); a rerun on 0.2.0, which adds the context-stability hook, is pending. The compaction and stale-`CLAUDE.md` results are pilots, one run per arm. Method, tables with confidence intervals, and every run: **[benchmarks/](benchmarks/README.md)**. Expect breaking changes before 1.0.
+> **What is measured so far.** Cost and correctness come from 6 paired runs per task on the 0.2.1 harness. The compaction and stale-`CLAUDE.md` results are pilots, one run per arm. Method, tables with confidence intervals, and every run: **[benchmarks/](benchmarks/README.md)**. Expect breaking changes before 1.0.
 
 <div align="center">
 
 # 🛠️ Agent Context Forge
 
-**An open-source starter for Claude Code: one command sets up a repo with the tools that measurably help, plus hooks that keep that setup true as the repo changes.**
+**An open-source starter for Claude Code: one command sets up a repo's context tooling, plus hooks that keep that setup true as the repo changes.**
 
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-paired%20runs%20on%20real%20repos-informational)](benchmarks/README.md)
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#the-5-pillars-under-the-hood)
@@ -37,11 +37,18 @@ npx agent-context-forge
 
 ## 🎯 What It Does, and What We Measured
 
-### 1. Sets up the tools that help
+### 1. Sets up the tools
 
 `npx agent-context-forge` asks a few questions and writes the setup into a new or existing repo: a lean `CLAUDE.md` that imports your `AGENTS.md`, [`rtk`](https://github.com/rtk-ai/rtk) to compress Bash output, stable project facts at session start (how this project runs its tests, BSD `sed`), a guard on whole-file reads of lockfiles and bundles, a note that suggests a subagent during long searches, Auto-Memory checks with a compaction handover, and an optional planning methodology. It offers to install `rtk` and your language server, and points you to Claude Code's code intelligence (LSP) plugin for your language.
 
-**Measured** in paired runs on real repos (6 pairs per task, on the v2 harness): fixing failing tests cost 10% less on Sonnet (and went from 5/6 to 6/6 correct) and 35% less on Haiku; code exploration cost 12% less on Sonnet. It costs more where there is little to save: +23% on a one-question lockfile task, and the LSP references rule cost +49% on Sonnet (it bought the only exact answers) and +21% on Haiku (no gain). Six-prompt sessions showed no significant difference. Tables with 90% confidence intervals, the tasks and graders, and every run: [benchmarks/](benchmarks/README.md).
+**Measured** in paired runs on real repos (6 pairs per task, 0.2.1 harness):
+- **Tool output:** 14–25% less on the click tasks (fixing failing tests on Sonnet and Haiku, a six-prompt session on Sonnet).
+- **Fewer wasted turns:** on Sonnet, the project facts removed every failed attempt to find the test command.
+- **No clear cost saving on any task:** cost changes ranged from −9% to +6%, each with a 90% interval that includes zero.
+- **Higher cost where there is little to save:** +22% on a one-question lockfile task.
+- **The LSP references rule:** +49% on Sonnet, where it gave the only exact answers (2 of 6 runs), and +51% on Haiku, with no gain.
+
+An earlier round reported 10–35% savings; a benchmark bug inflated them. Tables with 90% confidence intervals, the tasks and graders, every run, and the bug: [benchmarks/](benchmarks/README.md).
 
 ### 2. Keeps the setup true as the repo changes
 

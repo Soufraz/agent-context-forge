@@ -4,53 +4,95 @@ The evidence behind the numbers in the [main README](../README.md): paired runs 
 real open-source repositories, with and without the harness, graded against ground truth that
 no model produced. Each table below links to its per-run data.
 
-> **Status.** The cost results were measured on the v2 harness. A rerun on 0.2.1 (same tasks,
-> models and CLI version) is in progress, and its table will be added here. The context-stability
-> results are pilots with one run per arm. The runner scripts are not published yet; see
+> **Status.** Round 4 (the 0.2.1 harness) is the current result. Round 2 (the v2 harness) is
+> kept for the record, but a benchmark bug inflated its savings on the click tasks; see
+> [Round 2 and the benchmark bug](#round-2-and-the-benchmark-bug). The context-stability results
+> are pilots with one run per arm. The runner scripts are not published yet; see
 > [What is not here yet](#what-is-not-here-yet).
 
-## Cost and correctness (round 2: v2 harness, 6 paired runs per arm)
+## Cost and correctness (round 4: 0.2.1 harness, 6 paired runs per arm)
 
-| Task | Model | Correct (base / harness) | Cost change (90% CI) | Tool output | Peak context | Harness cheaper in |
+| Task | Model | Correct (base / harness) | Cost change (90% CI) | Tool output (90% CI) | Peak context | Harness cheaper in |
 |---|---|---|---|---|---|---|
-| Fix failing tests (click) | Haiku | 6/6 / 6/6 | **−35%** (−53% to −9%) | −31% | −15% | 5/6 pairs |
-| Explain request dispatch (gin) | Sonnet | 6/6 / 6/6 | **−12%** (−18% to −6%) | −14% | −4% | 6/6 |
-| Fix failing tests (click) | Sonnet | 5/6 / **6/6** | **−10%** (−18% to −3%) | **−34%** | −5% | 4/6 |
-| Six-prompt session (click) | Haiku | 6/6 / 6/6 | −7% (−21% to +7%) | −12% | −7% | 3/6 |
-| Six-prompt session (click) | Sonnet | 6/6 / 6/6 | +3% (−7% to +12%) | −12% | −2% | 3/6 |
-| All callers of a same-named function (date-fns) | Haiku | 0/6 / 0/6 | +21% (+5% to +39%) | −28% | +4% | 1/6 |
-| Lockfile question (TanStack/query) | Sonnet | 6/6 / 6/6 | +23% (+12% to +34%) | +11% | +4% | 0/6 |
-| All callers of a same-named function (date-fns) | Sonnet | 0/6 / **3/6** exact | +49% (+40% to +58%) | +5% | +11% | 0/6 |
+| Fix failing tests (click) | Sonnet | 6/6 / 6/6 | +2% (−6% to +11%) | **−25%** (−37% to −11%) | −2% | 3/6 pairs |
+| Fix failing tests (click) | Haiku | 6/6 / 6/6 | −9% (−33% to +16%) | **−24%** (−35% to −14%) | −8% | 3/6 |
+| Six-prompt session (click) | Sonnet | 6/6 / 6/6 | −1% (−8% to +4%) | **−14%** (−25% to −4%) | −2% | 2/6 |
+| Six-prompt session (click) | Haiku | 6/6 / 6/6 | +6% (−6% to +16%) | +7% (−21% to +35%) | +3% | 2/6 |
+| Explain request dispatch (gin) | Sonnet | 6/6 / 6/6 | 0% (−12% to +10%) | −5% (−19% to +9%) | −1% | 3/6 |
+| Lockfile question (TanStack/query) | Sonnet | 6/6 / 6/6 | **+22%** (+16% to +30%) | −7% (−20% to +7%) | +2% | 0/6 |
+| All callers of a same-named function (date-fns) | Sonnet | 0/6 / **2/6** exact | **+49%** (+38% to +58%) | +30% (−7% to +69%) | +15% | 0/6 |
+| All callers of a same-named function (date-fns) | Haiku | 0/6 / 0/6 | **+51%** (+34% to +68%) | +17% (−5% to +40%) | +13% | 0/6 |
 
+**What this shows:**
+- **No clear cost saving on any task.** Every cost decrease has a 90% interval that includes zero.
+- **Less tool output on three click tasks** (−14% to −25%), which doesn't move the total cost.
+- **Clear cost increases** on a small task (+22%) and with the LSP references rule (+49%, +51%).
+- **Correctness is the same in both conditions** except the date-fns task. There, the harness's
+  LSP rule gave the only exact answers (2 of 6 Sonnet runs).
+
+How to read the table:
 - **Correct:** graded against ground truth worked out without a model; [tasks.md](tasks.md) has
   each prompt and grader.
 - **Cost:** Claude Code's reported cost per run (`total_cost_usd`), failed runs included. The change is
   the mean of per-pair relative changes. The interval is a 90% bootstrap over the 6 pairs.
-- **Data:** [paired table with all three metrics](results/round-2-v2/paired.md) and
-  [every run](results/round-2-v2/runs.csv) (cost, tokens, turns, tool calls, grade).
+- **Data:** [paired table](results/round-4-v0.2.1/paired.md) and
+  [every run](results/round-4-v0.2.1/runs.csv) (cost, tokens, turns, tool calls, grade).
 
-### Where the savings come from
+### What the harness changes
 
-These attributions come from reading the transcripts; the harness was tested as a bundle.
+These come from reading the transcripts; the harness was tested as a bundle.
 
-- **Project facts at session start (test fixing).** Without the harness, agents tried
-  `python -m pytest`, then `python3`, before finding `uv run`: 12 environment failures in 6
-  Sonnet runs and 9 in 6 Haiku runs. With the fact "run project tools through uv", Sonnet hit 0
-  and Haiku 3.
-- **rtk through its own rewrite engine.** It also rewrites piped commands
-  (`uv run pytest -q 2>&1 | tail -40`), which is how agents run tests. Tool output fell 31–34%
-  in test fixing and 14% in exploration.
-- **The LSP references rule.** Sonnet called the LSP tool in 3 of 6 runs, and those were the only
-  runs in either condition to find all 19 call sites with no false positive.
+- **Project facts at session start.** On the test-fixing task, Sonnet without the harness tried
+  plain `python` or `pytest` before `uv run` in every run (7 attempts in 6 runs); with the
+  harness's "run project tools through uv" fact, none. That cut turns from 7.7 to 5.5, but not
+  cost.
+- **rtk compression.** It also rewrites piped commands (`uv run pytest -q 2>&1 | tail -40`), which
+  is how agents run tests, and it cut tool output by 14–25% on the click tasks. Tool output is a
+  small share of a run's cost: in round 1, cache writes were 57% of spend, the model's output
+  29% and cache reads 14%. So compression alone barely moves the total.
+- **The LSP references rule.** Sonnet called the LSP tool and found all 19 call sites in 2 of 6
+  runs, the only exact answers in either condition, at +49% cost. Haiku gained nothing, at +51%.
+- **The context-stability hook (new in 0.2).** In all 48 harness runs, it added no context and
+  blocked nothing: these tasks configure no rules, and their `CLAUDE.md` has no drift. Within
+  each pair, the harness added the same session-start context as v2 (+307 tokens on test
+  fixing).
 
 ### Where it costs more
 
-- **Lockfile question (+23%).** Both conditions answer correctly. On a ~$0.05 task, the harness's
-  fixed overhead (+300 to +850 tokens per request) and rtk's grouped grep output show up as cost.
-- **LSP rule (+49% on Sonnet, +21% on Haiku).** It bought exact answers on Sonnet. Haiku called
-  LSP but cited import lines as call sites, so it got no better.
-- **Six-prompt sessions: no significant difference.** Sonnet keeps such a session under ~40k
-  tokens of context, so there is little to compress.
+- **Lockfile question (+22%).** Both conditions answer correctly. On a ~$0.05 task, the
+  harness's fixed overhead (+300 to +850 tokens per request) shows up as cost.
+- **The LSP rule (+49% on Sonnet, +51% on Haiku).** It's worth it only where exact answers
+  matter more than cost, and only on Sonnet.
+
+## Round 2 and the benchmark bug
+
+Round 2 (the v2 harness, which in these tasks gives the model the same context as 0.2.1) reported savings that
+round 4 did not reproduce. The click-task savings were inflated by a bug, and the gin saving did
+not replicate:
+
+| Task | Model | Round 2 | Round 4 |
+|---|---|---|---|
+| Fix failing tests (click) | Haiku | −35% (−53% to −9%) | −9% (−33% to +16%) |
+| Fix failing tests (click) | Sonnet | −10% (−18% to −3%), correct 5/6 → 6/6 | +2% (−6% to +11%), 6/6 → 6/6 |
+| Explain request dispatch (gin) | Sonnet | −12% (−18% to −6%) | 0% (−12% to +10%) |
+
+- **The bug.** The click task templates carried compiled Python caches (`__pycache__`) whose
+  paths pointed at the benchmark's shared clone of the repo, not the run's own copy. So every
+  click run's test tracebacks named files outside its copy.
+  - One round-2 baseline run (Sonnet, test fixing, pair 1) followed those paths, fixed the
+    shared clone instead of its copy, and failed. That run is the "5/6", and its pair is −30% of
+    the −10%. Without it, the Sonnet saving was about −6%.
+  - Runs that didn't wander were still slowed down. Haiku baselines ran the test suite 5–11
+    times per run with the leak and 3–7 times without it. The harness, whose rtk output is
+    shorter, was hurt less, so the leak widened the gap.
+- **The fix, in round 4.** The caches are removed from the templates and the shared clone is
+  restored. Each run now records whether its copy held foreign caches and whether the shared
+  clone changed. No round-4 run touched it.
+- **Variance.** Gin is a Go task, untouched by the bug, and its −12% fell to 0%. At 6 pairs, an
+  effect of that size doesn't reliably replicate.
+
+Round 2's data stays in [results/round-2-v2/](results/round-2-v2/) for the record. Its tables are
+not evidence for the current harness.
 
 ## Context stability (pilots, one run per arm)
 
@@ -61,7 +103,9 @@ These attributions come from reading the transcripts; the harness was tested as 
 
 With Claude Code 2.1.308 these behaviours are already at the ceiling, so the harness's rule
 capture ships as a safeguard with no claimed gain. These are single runs: a rerun with 6 runs per
-arm is planned.
+arm is planned. The pilot templates carried the same compiled caches as round 2: one pilot run
+was shown a path outside its copy, none followed one, and no shared clone changed. The rerun
+will use clean templates.
 
 ## Drift check replay (no model)
 
@@ -90,27 +134,26 @@ Data: [results/drift-replay/](results/drift-replay/).
   (no user-level plugins, hooks or settings), `--strict-mcp-config`, auto-memory off, and a
   per-run budget cap. Grep and Glob aren't pre-granted, matching a default macOS session, where
   Claude Code searches with `grep` and `find` through Bash.
-- **Harness condition:** the harness installed with the wizard's defaults. For the date-fns task,
-  the `typescript-lsp` plugin is installed for each run's folder.
+- **Clean environment (round 4):** each run clears inherited `CLAUDE*` and `RTK_*` variables, so
+  it starts like a session opened in a terminal. Templates hold no compiled caches.
+- **Harness condition:** the harness installed with the wizard's defaults, pinned to the released
+  tag. For the date-fns task, the `typescript-lsp` plugin is installed for each run's folder.
 - **Sessions:** in the six-prompt task, each prompt is sent only after the previous answer.
 - **Metrics:** from Claude Code's stream-json events. Output and cache tokens come from
   `modelUsage`, since per-message counts are streaming snapshots.
 
 ## Limitations
 
-- **Small samples:** five repositories, two models, 6 pairs per arm. Intervals are wide for the
-  session task.
-- **Short sessions:** at most ~40k tokens of peak context on Sonnet. These runs say nothing about
-  long sessions with many compactions.
+- **Small samples:** five repositories, two models, 6 pairs per arm. Effects under about 10% don't
+  reliably replicate at this size (see gin above).
+- **Short sessions:** under 80k tokens of peak context. These runs say nothing about long
+  sessions with many compactions.
 - **Bundle, not components:** the harness was tested as a whole, not one mechanism at a time.
 - **One machine, one account type:** all runs used a Claude subscription, whose prompt cache
   lives one hour. With an API key the cache lives five minutes, which changes how much cache
   writes cost.
-- **Environment:** round 2's runs may have inherited environment variables from the Claude Code
-  session that launched them, such as its reasoning-effort setting; this was not recorded. Later
-  rounds clear those variables, so each run starts like a session opened in a terminal. Paired
-  comparisons are unaffected; comparing baselines across rounds is not reliable.
-- **Spend:** about $6.87 at API prices for round 2's 96 runs, and $2.04 for round 1's 24.
+- **Spend at API prices:** $6.82 for round 4's 96 runs, plus $3.70 for click runs discarded after
+  the bug was found. Round 2 cost $6.87 for 96 runs, and round 1 $2.04 for 24.
 
 ## Earlier round (v0.1 harness, 3 runs per arm, Sonnet)
 

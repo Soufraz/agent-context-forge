@@ -5,11 +5,11 @@
 
 # 🛠️ Agent Context Forge
 
-**An open-source CLI auditor and context-engineering harness that stops AI coding agents from busting prompt caches, reading 80k-token lockfiles, and polluting their own context window.**
+**An open-source harness for Claude Code that turns your project's checkable rules into hooks an agent can't skip, catches the commit that makes `CLAUDE.md` wrong, and trims context cost, with every claim measured.**
 
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#the-5-pillars-under-the-hood)
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
-[![Zero Telemetry](https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20Zero%20Telemetry-brightgreen)](#license)
+[![Zero Telemetry](https://img.shields.io/badge/Privacy-Zero%20Telemetry-brightgreen)](#license)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -34,19 +34,25 @@ npx agent-context-forge
 
 ---
 
-## 💥 Why AI Coding Agents Degrade Mid-Session
+## 🎯 What It Guarantees, and What We Measured
 
-When an AI coding agent starts a session, it feels sharp. Thirty minutes later, it forgets architectural rules, hallucinates file paths, and burns through API limits.
+Models are good at following instructions, and Claude Code is good at keeping them: in our benchmarks (Claude Code 2.1.308), Sonnet kept all seven rules of a session through one and through three compactions, and ignored stale `CLAUDE.md` lines when the code beside the edit showed they were wrong. So this harness does not promise that agents remember more. It promises things that hold whatever the model does:
 
-The root cause rarely lies in the model weights—it is **unmanaged context entropy**:
+| Promise | How | Evidence |
+| :--- | :--- | :--- |
+| **Checkable rules are enforced, not hoped for** | Rules in `.claude/enforced-rules.json` become hooks: required or forbidden commands, protected paths, files that must change in the same commit, checks before Claude finishes. A denial names the rule and the fix. | Enforcement holds by construction and is covered by the test suite. Turning instruction files into executable checks raised compliance from 67% to 88% in [ContextCov](https://arxiv.org/abs/2603.00822). |
+| **Context files stay true to the code** | A commit that deletes or renames a path `CLAUDE.md`, `AGENTS.md` or `.claude/rules` still name is stopped, in Claude Code and (with `core.hooksPath`) in plain git, naming the new path. At session start, paths that are already gone are named to Claude. No model, no tokens. | Replayed over 4,269 commits with context files (agent-context-forge, echo, pydantic-ai): it fired once, on a real rename that left pydantic-ai's `CLAUDE.md` wrong for 37 commits. No false notes on next.js, n8n, ruff, pydantic-ai or echo. |
+| **Context costs less on the tasks that bloat it** | Bash output compressed through `rtk`, whole-file lockfile reads blocked, stable project facts at session start. | Paired runs on real repos: fixing failing tests −10% cost on Sonnet (and 5/6 → 6/6 correct), −35% on Haiku; code exploration −12% on Sonnet. A one-question lockfile task cost +23%. |
+
+The failure modes below are what each pillar targets:
 
 | Failure Mode | What Happens by Default | How `agent-context-forge` Fixes It |
 | :--- | :--- | :--- |
-| **1. Prompt Cache Thrashing** | Storing sprint checklists (`- [ ]`), issue IDs (`#123`), or `TODO`s in `CLAUDE.md` invalidates the provider's KV prefix cache on every edit. | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
-| **2. Lockfile & Full-File Token Bombs** | A single stray `Read` on `pnpm-lock.yaml`, `Cargo.lock`, or `dist/` dumps **30,000–100,000 tokens** of noise into working memory. | **Pillar 2 (Progressive Disclosure):** Enables native compiler LSP (`ENABLE_LSP_TOOL=1`) for ~50ms symbol jumps + hard `permissions.deny` rules on token-bomb files. |
-| **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook transparently rewrites standalone test/git commands through [`rtk`](https://github.com/rtk-ai/rtk), collapsing passing suites (`✓ 142 passed`) while keeping 100% of failure diffs. |
-| **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive exploratory calls and blocks at `10`, forcing delegation to an isolated subagent (`Task`). |
-| **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that snapshots active git state before compaction. |
+| **1. Root Context Bloat & Churn** | Sprint checklists (`- [ ]`), issue IDs (`#123`), and `TODO`s pile up in `CLAUDE.md`. That file is re-sent on every turn, so each stale line costs tokens and dilutes the rules that matter. (Each edit also costs one prompt-cache miss at the next session start, but caches expire within minutes to an hour anyway, so size and focus matter more.) | **Pillar 1 (Prefix Stability):** Enforces a frozen `< 150 line` Tier-1 prefix and blocks volatile state or broken path references via a pre-commit gate. |
+| **2. Lockfile & Full-File Token Bombs** | Reading a lockfile, minified bundle, or source map whole loads up to 25,000 tokens of noise per call (Claude Code refuses files over 256 KB, so smaller ones are the risk). | **Pillar 2 (Progressive Disclosure):** Guides you to Claude Code's code intelligence plugin for your language (compiler-backed symbol lookups) + a hook that blocks only whole-file reads of those files, so grepping them still works. |
+| **3. Test & Build Output Floods** | Running `pytest`, `vitest`, or `cargo test` dumps hundreds of passing test lines and ANSI codes into the context window. | **Pillar 3 (Observation Masking):** A `PreToolUse` hook hands every Bash command to [`rtk`](https://github.com/rtk-ai/rtk)'s own rewrite engine, which covers piped and chained commands too (`uv run pytest -q \| tail -40` → `uv run rtk pytest -q \| tail -40`), collapsing passing suites while keeping failures. |
+| **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive searches and reads in the primary session (including `grep`/`find` through Bash) and, every `15`, adds a non-blocking note suggesting a subagent. |
+| **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that feeds active git state and preservation rules into the compaction summary. |
 
 ---
 
@@ -88,19 +94,22 @@ Evaluates your repository offline in `< 2 seconds` and opens `.agent-context-rep
   <img src="assets/report-mocks/suggestion1-executive-dashboard.svg" alt="Context Health Audit Dashboard Simulation" width="880">
 </p>
 
-* **Context Health Score (0–100 / Grade A–F)** + estimated **Prompt Cache Hit Rate** and **Token Waste Risk**.
+* **Context Health Score (0–100 / Grade A–F)** + measured **Tier-1 size** (lines, ~tokens) and **Unprotected Lockfile Exposure** (~tokens one stray `Read` could load). The tool doesn't report cache hit rates or token savings it hasn't measured.
 * **Exact `File:Line` Violations:** Pinpoints volatile markers (`TODO`, checkboxes, dates) and dead file paths inside `CLAUDE.md` / `AGENTS.md`.
 * **Live Token-Bomb Exposure:** Scans the repo for unprotected lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`) and calculates how many thousands of tokens an accidental `Read` will cost.
-* **Interactive Remediation:** Offers to automatically install missing binaries (`rtk`, `@vtsls/language-server`, `pyright`) right from the terminal.
+* **What the score measures:** how closely the repo follows the five pillars as this tool defines them. Treat it as a setup checklist, not a benchmark. A hook earns points only when it is wired in settings and its script exists, and equivalents count (rtk's own `rtk init -g` hook, any `PreCompact` or `SessionStart` `compact` hook). Two checks (16 points) look specifically for this harness's commit gate and exploration guardrail.
+* **Interactive Remediation:** Offers to automatically install missing binaries (`rtk`, `typescript-language-server`, `pyright`) right from the terminal, and prints the code intelligence plugin to install for your language.
 
 ### 2. Modular Stack Configurator (`Install` Mode)
 Lets you customize each layer instead of forcing a rigid template:
 * **Progressive Disclosure:** Claude Native LSP *(default)* or bring your own code-intelligence MCP/tool.
 * **Observation Masking:** [`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) *(default)* or custom output filter.
-* **Subagent Isolation:** `10-call` Exploration Guardrail Hook *(default)*, Orchestrator Tool Permission Scoping (`.claude/agents/orchestrator.md` with `Edit`/`Write` physically omitted), or both.
+* **Subagent Isolation:** Exploration Guardrail note after 15 consecutive searches *(default)*, Orchestrator Tool Permission Scoping (`.claude/agents/orchestrator.md`, whose `tools` allowlist leaves out `Edit`/`Write`), or both.
 * **Episodic Memory:** Built-in Claude Auto-Memory *(default, zero setup)* or [`context-mode`](https://github.com/mksglu/context-mode) *(sandboxed FTS5/BM25 MCP virtualization)*.
 * **SDD Pairing (Optional):** Pre-wires rules for [Superpowers SDD](https://github.com/obra/superpowers), [GetShitDone (GSD)](https://github.com/open-gsd/gsd-core), [ECC](https://github.com/affaan-m/everything-claude-code), or the [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model).
 * **Custom Context Bootstrapping (Optional):** Describe what you're building right in the CLI to generate a tailored, prefix-stable `CLAUDE.md`, `AGENTS.md`, and `.agents/rules/project-architecture.md`.
+* **Lean `CLAUDE.md`:** The `CLAUDE.md` the harness writes holds only rules that change how Claude works (your stack and constraints, a references rule for the LSP tool, and grepping lockfiles), because every line is sent with every request. Guidance for you sits in an HTML comment, which Claude Code strips before loading the file. When your repo already has an `AGENTS.md`, the new `CLAUDE.md` imports it with `@AGENTS.md`, since Claude Code reads only `CLAUDE.md` when both exist.
+* **Safe on existing repos:** Install never discards your configuration. `.claude/settings.json` is merged (your permissions and hooks are kept, and a `.bak` copy is saved first). Your `CLAUDE.md`, `AGENTS.md`, agents, rules, and git hooks are replaced only while they are unchanged since the last install. Once you have edited one (or wrote it yourself), it is kept, and the harness version is written next to it as `<file>.context-forge-new` for you to merge.
 
 ---
 
@@ -108,35 +117,50 @@ Lets you customize each layer instead of forcing a rigid template:
 
 A common question with agent hooks is: *"Do these hooks slow down every tool call or burn extra tokens?"*
 
-**No.** Every hook is designed around a **zero-token deterministic fast path**:
+**Almost never.** Every hook has a **zero-token deterministic fast path**. The one exception is the commit gate below, which calls a model only when a commit touches your agent context files:
 
 ### Pillar 1: Hybrid Pre-Commit Prefix Stability Gate
 * **File:** [`.claude/hooks/pre-commit-prefix-stability.sh`](.claude/hooks/pre-commit-prefix-stability.sh) + [`.githooks/pre-commit`](.githooks/pre-commit)
-* **Fast Filter (`< 2ms`, `0 tokens`):** Every non-commit `Bash` command exits `0` immediately via a shell regex check.
-* **Commit Audit:** Only when `git commit` is invoked (and context files are present), a headless read-only evaluation (`claude -p --model haiku`) verifies:
+* **Fast Filter (`< 2ms`, `0 tokens`):** Every non-commit `Bash` command exits `0` immediately via a shell regex check, and so does every `git commit` while `CLAUDE.md`, `AGENTS.md`, `.claude/`, and `.agents/` have no pending changes.
+* **Commit Audit (not free, not local):** When a commit does touch those paths, a headless read-only evaluation (`claude -p --model haiku`) runs under your Claude Code login. It sends your context files and diff to the model and uses tokens. It verifies:
   1. `CLAUDE.md` / `AGENTS.md` stays `< 150 lines` (`~1,000 tokens`).
   2. Zero volatile task state (no checkboxes, issue IDs, or deadlines).
   3. Zero duplicate rules between Tier 1 (`CLAUDE.md`) and Tier 2 (`.claude/agents/`, `.claude/skills/`).
   4. Every referenced file path and script actually exists in the repository.
 
-### Pillar 2: Progressive Disclosure via LSP & Token-Bomb Denials
-* **Files:** [`.claude/settings.json`](.claude/settings.json) + [`scripts/agent-gates/check-lsp.sh`](scripts/agent-gates/check-lsp.sh)
-* **Mechanism:** Exports `"ENABLE_LSP_TOOL": "1"` so Claude Code uses `LSPGoToDefinition`, `LSPFindReferences`, and `LSPDocumentSymbols` instead of reading full files.
-* **Hard Denials:** Pre-populates `permissions.deny` for `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `node_modules/**`, `dist/**`, `.next/**`, and `*.min.js`.
+### Pillar 2: Progressive Disclosure via LSP & Whole-File Read Guard
+* **Files:** [`.claude/hooks/guard-whole-file-reads.sh`](.claude/hooks/guard-whole-file-reads.sh) + [`scripts/agent-gates/check-lsp.sh`](scripts/agent-gates/check-lsp.sh)
+* **Mechanism:** Claude Code's `LSP` tool (go to definition, find references, diagnostics after edits) stays off until you install a [code intelligence plugin](https://code.claude.com/docs/en/plugins/code-intelligence) for your language, and a language server on `PATH` is not enough on its own. The doctor and scanner check that the plugin is installed for the project folder (e.g. `claude plugin install typescript-lsp@claude-plugins-official`), not just enabled in settings, and that the binary it starts can run. For TypeScript that means `npm install -g typescript-language-server typescript@6`: TypeScript 7 no longer ships the `tsserver.js` the server needs.
+* **References rule:** The generated `CLAUDE.md` asks Claude to use the `LSP` tool's references lookup for "who calls X" questions. Left to itself, Claude almost always reaches for grep, which conflates same-named symbols and misses aliased imports.
+* **Whole-File Read Guard:** A `PreToolUse` hook on `Read` blocks reading lockfiles, minified bundles, and source maps whole, and tells Claude to grep them or read a range instead. It replaces `permissions.deny` Read rules, which also block every Grep and `grep` of those files and made agents fail questions like "which version is locked". Upgrading from v0.1 removes the deny rules it added.
 
 ### Pillar 3: Transparent Observation Masking (`rtk`)
 * **File:** [`.claude/hooks/rewrite-rtk.sh`](.claude/hooks/rewrite-rtk.sh) + [`scripts/agent-gates/check-rtk.sh`](scripts/agent-gates/check-rtk.sh)
-* **Mechanism:** Intercepts standalone high-noise commands (`pytest`, `vitest`, `jest`, `cargo test/check/clippy/build`, `pnpm/npm/yarn test`, `go test`, `git status/diff/log/show`) and transparently rewrites the command input to `rtk <cmd>` via Claude Code's `updatedInput` protocol.
-* **Safety:** Automatically skips piped, chained, redirected, or multiline commands (`|`, `&&`, `;`, `>`) so raw stdout pipelines are never broken. If `rtk` is not installed on `PATH`, the hook exits `0` in `< 1ms`.
+* **Mechanism:** Passes each Bash command to `rtk hook claude`, rtk's own rewrite engine, through Claude Code's `updatedInput` protocol. Agents usually trim output themselves (`2>&1 | tail -40`), so a hook that skipped piped commands never fired; rtk rewrites the first stage of such pipelines and each part of `&&` chains. If `rtk` is not installed on `PATH`, the hook exits `0` in `< 1ms`.
+* **Safety:** `python -m pytest` is left alone, because rtk would run whichever `pytest` is first on `PATH`. rtk refuses to rewrite commands with file redirects or `$(...)`. The project settings set `RTK_SUPPRESS_HOOK_WARNING=1`, since rtk's "no hook installed" notice only looks at global settings.
+* **No auto-approval:** rtk approves a rewrite only when your own allow rules already match the command, and leaves deny rules to Claude Code. Commands like `npm test` run arbitrary project code, so otherwise your normal permission prompt applies.
+* **rtk's own hook:** rtk ships a Claude Code hook of its own (`rtk init -g`). When it is configured, this hook stands down so commands are not rewritten twice. Install rtk with `brew install rtk` (or see [its install guide](https://github.com/rtk-ai/rtk#installation)), not `cargo install`: a different crate named `rtk` exists on crates.io.
 
 ### Pillar 4: Subagent Context Isolation
 * **Files:** [`.claude/hooks/guard-subagent-isolation.py`](.claude/hooks/guard-subagent-isolation.py) + [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md)
-* **Mechanism:** Tracks consecutive `Read`, `Grep`, and `Glob` calls per session in `/tmp/agent_context_forge/`.
-* **Threshold:** Calls `1–9` pass silently (`< 5ms`, `0 tokens`). On call `10`, returns `permissionDecision: "deny"` instructing the primary agent to dispatch a fresh research subagent (`Task` tool) and return only a concise synthesis. Resets automatically when `Task`, `Write`, or `Edit` is called.
+* **Mechanism:** Tracks consecutive `Read`, `Grep`, and `Glob` calls, plus Bash commands that only search or read (`grep`, `rg`, `find`, `cat`, `sed -n`, ...), per session in `/tmp/agent_context_forge/`. Claude Code searches through Bash by default on macOS and Linux. Calls made inside subagents (hook input carries an `agent_id`) are not counted.
+* **Threshold:** Calls `1–14` pass silently (`< 5ms`, `0 tokens`). On call `15`, it adds a note (`additionalContext`) suggesting a subagent, without blocking the call, then re-arms for the next `15`. Denying the call only cost a retry in benchmarks, and agents did not delegate in response. Resets when `Agent`, `Write`, or `Edit` is called.
 
 ### Pillar 5: Episodic Memory & Lossy Compaction Handover
 * **Files:** [`.claude/hooks/pre-compact-handover.sh`](.claude/hooks/pre-compact-handover.sh) + [`scripts/agent-gates/check-memory.sh`](scripts/agent-gates/check-memory.sh)
-* **Mechanism:** Verifies Claude Code's native two-tier Auto-Memory (`~/.claude/projects/<slug>/memory/MEMORY.md`) on `SessionStart`, and triggers on `PreCompact` to snapshot `git status -s` + `git diff --stat` and inject preservation rules before context summarization occurs.
+* **Mechanism:** Verifies Claude Code's native two-tier Auto-Memory (`~/.claude/projects/<slug>/memory/MEMORY.md`) on `SessionStart`, and triggers on `PreCompact` to print `git status -s` + `git diff --stat` and preservation rules. Claude Code uses a PreCompact hook's stdout as instructions for the compaction summary.
+
+### Context Stability: Rules That Outlive Compaction, Rule Gates, and Drift Notes
+* **Files:** [`.claude/hooks/context-stability.py`](.claude/hooks/context-stability.py) + `.claude/enforced-rules.json`
+* **Rule capture:** on `UserPromptSubmit`, keeps the sentences of your prompts that state a rule ("always ...", "never ...", "from now on ...", "heads-up for later ...") in a per-session file under `/tmp/agent_context_forge/`. Before compaction, `PreCompact` asks the summary to carry them word for word; after it, `SessionStart` (source `compact`) re-injects them word for word, so they no longer depend on the summary. CLAUDE.md itself is reloaded by Claude Code after compaction.
+* **Rule gates:** the checkable rules in `.claude/enforced-rules.json` are enforced by hooks instead of instructions. `command` rules check Bash commands (`when` / `require` / `forbid` / `unless` regexes, including `git commit -F` message files); `path` rules deny Edit/Write on globs; `commit` rules require a file in the same commit (for example `CHANGES.md` whenever `src/*` changes, counting `git add` in the same command); `stop` rules are checked once before Claude finishes. A denial names the rule and how to comply. Commits in other repositories are left alone.
+* **Drift check at commit time:** a commit that deletes or renames a path still named by `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` or `.claude/rules/*.md` is denied until the instruction file is updated in the same commit; the message names the new path of a rename. It counts `git rm`, `git mv`, `git add` and `git commit -a` in the same command. Only paths the commit removes count, so references that were already stale never block unrelated work. Outside Claude Code, `.githooks/pre-commit` runs the same check (`context-stability.py --check-staged`) once you set `git config core.hooksPath .githooks`.
+* **Drift note:** at session start, names backticked paths in those files that no longer exist, and tells Claude to trust the code over those lines. A path counts only when its first directory exists in the repo and it is neither the tail of a tracked path nor git-ignored, so package names, URLs and examples don't trigger it (no false notes on next.js, n8n, ruff, pydantic-ai or echo). Startup adds nothing when there is no drift, so the prompt prefix stays stable.
+* **Measured:** the commit-time check, replayed over 4,269 commits with context files, fired once, on a real rename that left pydantic-ai's `CLAUDE.md` wrong for 37 commits. Rule capture showed no gain in our benchmarks because Claude Code already kept every rule through one and three compactions; it is a safeguard for longer sessions, not a measured improvement.
+
+### Session Start: Project Facts
+* **File:** [`scripts/agent-gates/session-context.sh`](scripts/agent-gates/session-context.sh)
+* **Mechanism:** Gives Claude a few stable facts that save discovery turns, such as how this project runs its tests (`uv run pytest`, `pnpm test`, `go test ./...`) and that `sed -i` needs `''` on macOS. Agents otherwise spent several turns trying `python`, `python3`, and finally `uv run`. Warnings from the environment doctor (missing rtk, language server, or plugin) go to you as a message instead of into Claude's context. The facts contain no paths, dates, or counts, so the prompt prefix stays identical across sessions and caches well.
 
 ---
 
@@ -161,7 +185,7 @@ While all hooks are production-ready for **Claude Code** and **Universal Git** t
 | **Universal Git (CLI / IDEs)** | Standard Git pre-commit wrapper in `.githooks/pre-commit` | ✅ **Production Ready** |
 | **Gemini CLI / Antigravity** | `.agents/rules/` + Tool Execution Policy adapters | 🚧 [Issue #1](https://github.com/Soufraz/agent-context-forge/issues/1) |
 | **OpenCode / Aider** | `AGENTS.md` + `.agents/` universal standard | 🚧 [Issue #1](https://github.com/Soufraz/agent-context-forge/issues/1) |
-| **Multi-LSP & Compressor Adapters** | Pluggable LSP & output masking alternatives beyond `vtsls` / `rtk` | 🚧 [Issue #2](https://github.com/Soufraz/agent-context-forge/issues/2), [Issue #3](https://github.com/Soufraz/agent-context-forge/issues/3) |
+| **Multi-LSP & Compressor Adapters** | Pluggable LSP & output masking alternatives beyond the official LSP plugins / `rtk` | 🚧 [Issue #2](https://github.com/Soufraz/agent-context-forge/issues/2), [Issue #3](https://github.com/Soufraz/agent-context-forge/issues/3) |
 
 ---
 
@@ -191,7 +215,7 @@ Brilliant creators across the open-source community have built focused, high-imp
 We extend our deepest respect and fair-use attribution to the creators whose tools, research, and ideas made this project possible:
 
 * **[`rtk` (Rust Token Killer)](https://github.com/rtk-ai/rtk) by [@rtk-ai](https://github.com/rtk-ai):** An outstanding, blisteringly fast Rust tool that revolutionizes tool-call observation masking by collapsing passing test suites while retaining 100% of failure diffs.
-* **Anthropic & Claude Code:** For pioneering native compiler-backed LSP tool discovery (`LSPGoToDefinition`, `LSPFindReferences`), deterministic shell lifecycle hooks (`SessionStart`, `PreToolUse`, `PreCompact`), and machine-local two-tier Auto-Memory.
+* **Anthropic & Claude Code:** For native compiler-backed code intelligence through LSP plugins, deterministic shell lifecycle hooks (`SessionStart`, `PreToolUse`, `PreCompact`), and machine-local two-tier Auto-Memory.
 * **[`@clack/prompts`](https://github.com/natemoo-re/clack) & [`picocolors`](https://github.com/alexeyraspopov/picocolors) by Nate Moore & Alexey Raspopov:** For crafting the clean, accessible, terminal UI and formatting primitives that power the interactive CLI wizard.
 * **Layer-2 Methodology Creators & Communities:**
   * **[Superpowers SDD](https://github.com/obra/superpowers) by Jesse Vincent (`obra/superpowers`):** For pioneering systematic subagent dispatching, strict TDD red-green-refactor loops, and structured planning.

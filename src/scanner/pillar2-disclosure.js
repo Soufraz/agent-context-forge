@@ -1,6 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { inspectDirectory } from '../detector.js';
+import {
+  installedPluginsFor,
+  isPluginEnabled,
+  lspPluginsFor,
+  pluginInstallCommand,
+  tsserverAvailable
+} from '../lsp-plugins.js';
+import { findHook, loadSettingsLayers } from './settings.js';
 
 /**
  * Audits Pillar 2: Progressive Disclosure via Language Server Protocol & Token Bomb Protection
@@ -19,24 +28,6 @@ export function auditPillar2(projectDir) {
     } catch {}
   }
 
-  // 1. ENABLE_LSP_TOOL flag in settings.json (4 pts)
-  const lspFlag = settings?.env?.ENABLE_LSP_TOOL;
-  if (lspFlag === '1' || lspFlag === 1) {
-    score += 4;
-    findings.push({
-      status: 'pass',
-      title: 'Native LSP Intelligence Enabled (ENABLE_LSP_TOOL=1)',
-      description: 'Claude Code is configured to use language server symbol queries.'
-    });
-  } else {
-    findings.push({
-      status: 'warn',
-      title: 'ENABLE_LSP_TOOL Flag Missing',
-      description: 'Claude Code will rely on broad text search instead of compiler-backed symbol navigation.'
-    });
-  }
-
-  // 2. Language Server binary on PATH (8 pts)
   const isCommandAvailable = (cmd) => {
     try {
       execSync(`command -v ${cmd}`, { stdio: 'ignore' });
@@ -46,54 +37,103 @@ export function auditPillar2(projectDir) {
     }
   };
 
-  const detectedLSPs = [];
-  if (isCommandAvailable('vtsls')) detectedLSPs.push('vtsls (TypeScript)');
-  if (isCommandAvailable('typescript-language-server')) detectedLSPs.push('typescript-language-server');
-  if (isCommandAvailable('pyright')) detectedLSPs.push('pyright (Python)');
-  if (isCommandAvailable('pylsp')) detectedLSPs.push('pylsp (Python)');
-  if (isCommandAvailable('gopls')) detectedLSPs.push('gopls (Go)');
-  if (isCommandAvailable('rust-analyzer')) detectedLSPs.push('rust-analyzer (Rust)');
+  // Score only the language servers for this repo's own languages
+  const servers = lspPluginsFor(inspectDirectory(projectDir).projectTypes);
+  const layers = loadSettingsLayers(projectDir);
 
-  if (detectedLSPs.length > 0) {
-    score += 8;
+  if (servers.length === 0) {
+    findings.push({
+      status: 'warn',
+      title: 'No Language With an Official Code Intelligence Plugin Detected',
+      description:
+        'LSP navigation needs a code intelligence plugin for the repo language (see https://code.claude.com/docs/en/plugins/code-intelligence).'
+    });
+  } else {
+    // 1. Code intelligence plugin installed for this folder, per language (4 pts). This, not a
+    //    settings flag, is what turns on Claude Code's LSP tool. Without the claude CLI, fall
+    //    back to what settings enable.
+    const installed = installedPluginsFor(projectDir);
+    const isActive = (plugin) =>
+      installed ? installed.some((id) => id.startsWith(`${plugin}@`)) : isPluginEnabled(layers, plugin);
+    const missingPlugins = servers.filter((server) => !isActive(server.plugin));
+    score += Math.round((4 * (servers.length - missingPlugins.length)) / servers.length);
+    if (missingPlugins.length === 0) {
+      findings.push({
+        status: 'pass',
+        title: `Code Intelligence Plugin Enabled: ${servers.map((s) => s.plugin).join(', ')}`,
+        description: "Claude Code's LSP tool is active for this repo's languages."
+      });
+    } else {
+      findings.push({
+        status: 'warn',
+        title: `Code Intelligence Plugin Not Installed: ${missingPlugins.map((s) => s.plugin).join(', ')}`,
+        description: `Claude Code keeps its LSP tool off until the plugin is installed. Run: ${missingPlugins
+          .map(pluginInstallCommand)
+          .join(' && ')}`
+      });
+    }
+
+    // 2. The binary each plugin starts is on PATH and can run (8 pts)
+    const missingBinaries = servers.filter(
+      (server) => !isCommandAvailable(server.binary) || (server.needsTsserver && !tsserverAvailable(projectDir))
+    );
+    score += Math.round((8 * (servers.length - missingBinaries.length)) / servers.length);
+    if (missingBinaries.length === 0) {
+      findings.push({
+        status: 'pass',
+        title: `Language Server(s) Available: ${servers.map((s) => `${s.binary} (${s.language})`).join(', ')}`,
+        description: 'Progressive symbol resolution (goToDefinition, findReferences) is ready to operate.'
+      });
+    } else {
+      findings.push({
+        status: 'warn',
+        title: `Language Server Missing for ${missingBinaries.map((s) => s.language).join(', ')}`,
+        description: `The code intelligence plugin needs its binary on PATH. Install: ${missingBinaries
+          .map((s) => s.install)
+          .join(' && ')}`
+      });
+    }
+  }
+
+  // 3. Whole-file read guard for lockfiles and bundles (4 pts). permissions.deny Read rules
+  //    also stop Grep and `grep` on those files, so they get partial credit and a warning.
+  const deniedList = Array.isArray(settings?.permissions?.deny) ? settings.permissions.deny : [];
+  const denyRulesCoverLockfiles = deniedList.some((rule) => /lock/.test(rule));
+  const readGuard = findHook(projectDir, layers, 'PreToolUse', /guard-whole-file-reads\.sh/);
+  const protectsLockfiles = readGuard.working || denyRulesCoverLockfiles;
+
+  if (readGuard.working) {
+    score += 4;
     findings.push({
       status: 'pass',
-      title: `Language Server(s) Available: ${detectedLSPs.join(', ')}`,
-      description: 'Progressive symbol resolution (goToDefinition, findReferences) is ready to operate.'
+      title: 'Whole-File Reads of Lockfiles and Bundles Are Guarded',
+      description: 'A PreToolUse hook blocks reading lockfiles, minified bundles, and source maps whole, and points to grep. Searches and ranged reads still work.'
+    });
+  } else if (denyRulesCoverLockfiles) {
+    score += 2;
+    findings.push({
+      status: 'warn',
+      title: 'Lockfiles Are Blocked by permissions.deny',
+      description:
+        'Read deny rules also block Grep and `grep` on those files, so agents cannot answer questions like "which version is locked". Prefer a hook that blocks only whole-file reads.'
     });
   } else {
     findings.push({
       status: 'warn',
-      title: 'No Supported Language Server Detected on PATH',
-      description: 'Install a language server (e.g. npm i -g @vtsls/language-server, pyright, gopls, or rust-analyzer) to enable ~70% token savings on symbol lookups.'
+      title: 'Nothing Guards Whole-File Reads of Lockfiles',
+      description: 'Claude Code refuses to Read files over 256 KB and caps one Read at 25,000 tokens, so the exposure is smaller lockfiles read whole.'
     });
   }
 
-  // 3. permissions.deny Token-Bomb configuration (4 pts)
-  const deniedList = settings?.permissions?.deny || [];
-  const hasDenyRules = Array.isArray(deniedList) && deniedList.length > 0;
-  const protectsLockfiles = deniedList.some((rule) => rule.includes('lock'));
-
-  if (hasDenyRules && protectsLockfiles) {
-    score += 4;
-    findings.push({
-      status: 'pass',
-      title: `Token Bomb Denials Active (${deniedList.length} rules)`,
-      description: 'permissions.deny blocks accidental reads of lockfiles, build outputs, and minified bundles.'
-    });
-  } else {
-    findings.push({
-      status: 'fail',
-      title: 'No Token Bomb Denials in permissions.deny',
-      description: 'An accidental Read call on a lockfile or build bundle can dump 20,000–100,000 tokens into context RAM.'
-    });
-  }
-
-  // 4. Discovery of unprotected token-bomb files in repo (4 pts)
+  // 4. Lockfile exposure in the repo root (4 pts). What one whole-file Read would load: nothing
+  //    for files over 256 KB (Read refuses them), at most 25,000 tokens otherwise (bytes / 4).
+  const READ_MAX_BYTES = 256 * 1024;
+  const READ_MAX_TOKENS = 25000;
   const commonTokenBombs = [
     'package-lock.json',
     'pnpm-lock.yaml',
     'yarn.lock',
+    'bun.lock',
     'Cargo.lock',
     'poetry.lock',
     'uv.lock'
@@ -104,37 +144,37 @@ export function auditPillar2(projectDir) {
     const fullPath = path.join(projectDir, tb);
     if (fs.existsSync(fullPath)) {
       const stats = fs.statSync(fullPath);
-      const sizeKb = Math.round(stats.size / 1024);
-      const estTokens = Math.round(stats.size / 4);
-      foundTokenBombs.push({ file: tb, sizeKb, estTokens });
+      const estTokens = stats.size > READ_MAX_BYTES ? 0 : Math.min(READ_MAX_TOKENS, Math.round(stats.size / 4));
+      foundTokenBombs.push({ file: tb, sizeKb: Math.round(stats.size / 1024), estTokens });
     }
   }
+  const exposed = protectsLockfiles ? [] : foundTokenBombs.filter((f) => f.estTokens > 0);
 
   if (foundTokenBombs.length === 0) {
     score += 4;
     findings.push({
       status: 'pass',
-      title: 'No Raw Lockfiles in Repository Root',
-      description: 'No massive lockfiles found in root to threaten context budget.'
+      title: 'No Lockfiles in Repository Root',
+      description: 'No lockfiles found in the root to threaten the context budget.'
+    });
+  } else if (exposed.length === 0) {
+    score += 4;
+    findings.push({
+      status: 'pass',
+      title: `Lockfiles Can't Be Read Whole: ${foundTokenBombs.map((f) => `${f.file} (${f.sizeKb} KB)`).join(', ')}`,
+      description: protectsLockfiles
+        ? 'Whole-file reads of these lockfiles are blocked.'
+        : 'Each is over 256 KB, which Claude Code refuses to Read whole.'
     });
   } else {
-    // If found, check if they are protected
-    if (protectsLockfiles) {
-      score += 4;
-      findings.push({
-        status: 'pass',
-        title: `Discovered Lockfiles are Protected: ${foundTokenBombs.map((f) => `${f.file} (~${f.estTokens} tokens)`).join(', ')}`,
-        description: 'Lockfiles exist in project but are safely guarded by permissions.deny.'
-      });
-    } else {
-      findings.push({
-        status: 'fail',
-        title: `Unprotected Token Bomb(s) Found in Project: ${foundTokenBombs.map((f) => f.file).join(', ')}`,
-        description: 'These files exist and could be read in full by an agent, causing catastrophic context dilution.',
-        details: foundTokenBombs
-      });
-    }
+    findings.push({
+      status: 'fail',
+      title: `Lockfiles Can Be Read Whole: ${exposed.map((f) => `${f.file} (~${f.estTokens} tokens)`).join(', ')}`,
+      description: 'An agent can load these into context in one Read call.',
+      details: exposed
+    });
   }
 
-  return { score, maxScore, findings };
+  const unprotectedTokens = exposed.reduce((sum, f) => sum + f.estTokens, 0);
+  return { score, maxScore, findings, stats: { unprotectedTokens } };
 }

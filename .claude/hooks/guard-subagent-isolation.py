@@ -2,22 +2,34 @@
 """
 Claude Code PreToolUse Hook: Subagent Context Isolation Guardrail (Pillar 4)
 
-Monitors the primary agent's tool calls to prevent runaway inline exploration.
-If the agent executes too many consecutive exploratory calls (Read, Grep, Glob)
-without dispatching a subagent (Task tool) or editing code, it triggers a
-protective permission denial advising the agent to isolate context into a subagent.
+Monitors the primary agent's tool calls for runaway inline exploration. Every time the
+agent makes too many consecutive exploratory calls (Read, Grep, Glob, or searching and
+reading through Bash, which is how Claude Code searches on macOS and Linux by default)
+without dispatching a subagent or editing code, it adds a note suggesting a subagent.
+
+The note never blocks the call: denying it only cost a retry in benchmarks, and agents did
+not delegate in response.
+
+Calls made inside subagents are ignored: hooks fire there too, with the parent's
+session_id plus an agent_id, and exploring is exactly what a subagent is for.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
-MAX_CONSECUTIVE_EXPLORATIONS = 10
+MAX_CONSECUTIVE_EXPLORATIONS = 15
 EXPLORATORY_TOOLS = {"Read", "Grep", "Glob"}
-RESET_TOOLS = {"Task", "Write", "Edit"}
+# Bash commands that only search or read, optionally after a `cd dir &&`
+EXPLORATORY_BASH = re.compile(
+    r"^\s*(?:cd\s+\S+\s*(?:&&|;)\s*)?(?:grep|rg|find|fd|cat|head|tail|less|tree|ls|wc|sed\s+-n)\b"
+)
+# "Task" is the delegation tool's name before Claude Code v2.1.63 renamed it to "Agent"
+RESET_TOOLS = {"Agent", "Task", "Write", "Edit"}
 
 
 def get_state_path(session_id: str) -> Path:
@@ -33,7 +45,7 @@ def load_state(path: Path) -> dict:
             return json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return {"count": 0, "warned": False}
+    return {"count": 0}
 
 
 def save_state(path: Path, state: dict) -> None:
@@ -52,6 +64,10 @@ def main() -> int:
     except Exception:
         return 0
 
+    # Subagent tool calls belong to the subagent's own context, not the primary one
+    if payload.get("agent_id"):
+        return 0
+
     tool_name = payload.get("tool_name", "")
     session_id = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID", "default")
     state_path = get_state_path(session_id)
@@ -60,34 +76,30 @@ def main() -> int:
     # 1. Reset exploration counter when task delegation or code writing occurs
     if tool_name in RESET_TOOLS:
         state["count"] = 0
-        state["warned"] = False
         save_state(state_path, state)
         return 0
 
     # 2. Track consecutive exploratory search tool calls
-    if tool_name in EXPLORATORY_TOOLS:
+    command = (payload.get("tool_input") or {}).get("command") or ""
+    if tool_name in EXPLORATORY_TOOLS or (tool_name == "Bash" and EXPLORATORY_BASH.match(command)):
         count = state.get("count", 0) + 1
-        warned = state.get("warned", False)
         state["count"] = count
 
-        # Trigger guardrail at threshold once to guide the agent
-        if count >= MAX_CONSECUTIVE_EXPLORATIONS and not warned:
-            state["warned"] = True
+        # Trigger guardrail at the threshold, then re-arm for the next run of explorations
+        if count >= MAX_CONSECUTIVE_EXPLORATIONS:
+            state["count"] = 0
             save_state(state_path, state)
 
-            reason = (
-                f"Context Isolation Guardrail: {count} consecutive exploratory search calls "
-                f"({tool_name}) executed in the primary context window.\n"
-                "To prevent context dilution (lost-in-the-middle) and save tokens, please delegate "
-                "this investigation to a fresh research subagent (via the Task tool) and return "
-                "only a concise synthesis to this session."
+            note = (
+                f"Context Isolation Guardrail: {count} consecutive search and read calls have run in "
+                "the main session. A broad investigation like this can run in a subagent (Agent tool, "
+                "Explore type) that returns only a summary, which keeps the main context small."
             )
 
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
+                    "additionalContext": note,
                 }
             }
             print(json.dumps(output))

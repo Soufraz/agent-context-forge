@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Claude Code PreToolUse Hook: Transparent RTK Observation Masking (Pillar 3)
 #
-# When `rtk` (Rust Token Killer) is installed on PATH, automatically prefixes
-# noisy standalone test, build, and git inspection commands with `rtk` via
-# Claude Code's `updatedInput` protocol (~60-90% token savings on test runs).
-# If `rtk` is not installed, exits 0 immediately without modifying the command.
+# Delegates to rtk's own Claude Code hook (`rtk hook claude`), which rewrites the commands
+# agents actually run, including piped and chained ones: `uv run pytest -q 2>&1 | tail -40`
+# becomes `uv run rtk pytest -q 2>&1 | tail -40`. rtk approves a rewrite only when the user's
+# own allow rules already match the command, and leaves deny rules to Claude Code.
+#
+# Exits 0 without output when rtk is missing, or when rtk's hook is already configured in
+# settings (`rtk init -g`), so commands are never rewritten twice.
 
 set -euo pipefail
 
@@ -18,38 +21,22 @@ if [ -z "$PAYLOAD" ]; then
   exit 0
 fi
 
-TOOL_NAME="$(printf '%s' "$PAYLOAD" | jq -r '.tool_name // empty' 2>/dev/null || true)"
-if [ "$TOOL_NAME" != "Bash" ]; then
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+if grep -qsE 'rtk hook claude|rtk-rewrite\.sh' \
+  "$HOME/.claude/settings.json" \
+  "$PROJECT_ROOT/.claude/settings.json" \
+  "$PROJECT_ROOT/.claude/settings.local.json"; then
   exit 0
 fi
 
+# 2. rtk turns `python -m pytest` into `rtk pytest`, which runs whatever pytest is first on
+#    PATH and drops `-m`'s sys.path behaviour, so it can test the wrong environment.
 COMMAND="$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
-if [ -z "$COMMAND" ]; then
+if printf '%s' "$COMMAND" | grep -qE '(^|[^[:alnum:]_./-])(\S*/)?python[0-9.]*[[:space:]]+-m[[:space:]]+pytest'; then
   exit 0
 fi
 
-# 2. Do not rewrite if already using rtk, multiline, or using pipes/redirects/chains
-if [ "$(printf '%s\n' "$COMMAND" | wc -l | tr -d ' ')" -gt 1 ]; then
-  exit 0
-fi
-if printf '%s' "$COMMAND" | grep -qE '^[[:space:]]*rtk([[:space:]]|$)|[|;&><`$]'; then
-  exit 0
-fi
-
-# 3. Match standalone high-noise test/build/git commands supported by rtk
-if printf '%s' "$COMMAND" | grep -qE '^[[:space:]]*(pytest|vitest|jest|cargo[[:space:]]+(test|check|clippy|build)|pnpm[[:space:]]+test|npm[[:space:]]+test|yarn[[:space:]]+test|go[[:space:]]+test|git[[:space:]]+(status|diff|log|show))([[:space:]]|$)'; then
-  TRIMMED="$(printf '%s' "$COMMAND" | sed -e 's/^[[:space:]]*//')"
-  UPDATED_CMD="rtk $TRIMMED"
-
-  jq -n --arg cmd "$UPDATED_CMD" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "allow",
-      updatedInput: {
-        command: $cmd
-      }
-    }
-  }'
-fi
-
-exit 0
+# 3. Let rtk decide the rewrite. Its "no hook installed" notice only checks the global
+#    settings, so silence it for this project-level install.
+export RTK_SUPPRESS_HOOK_WARNING=1
+printf '%s' "$PAYLOAD" | rtk hook claude || true

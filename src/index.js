@@ -37,9 +37,9 @@ export async function runCli() {
     )} | ${pc.cyan('Repository & Memory = Disk')} ${pc.white('(queried on demand)')}\n\n` +
       `${asciiChart}\n\n` +
       `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
-      `  ${pc.yellow('1. Prefix Stability')}       → Freeze Tier-1 root rules (<150 lines) for >80% prompt cache hits.\n` +
+      `  ${pc.yellow('1. Prefix Stability')}       → Keep Tier-1 root rules small and static (<150 lines); they ride along on every turn.\n` +
       `  ${pc.yellow('2. Progressive Disclosure')} → Query compiler symbols (LSP) instead of reading 400-line files.\n` +
-      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK (~60–90% token savings).\n` +
+      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK.\n` +
       `  ${pc.yellow('4. Context Isolation')}      → Delegate sprawling searches to subagents; keep chat flat.\n` +
       `  ${pc.yellow('5. Episodic Memory')}        → Retain cross-session lessons in Auto-Memory outside repo files.`,
     '📖 Welcome & Core Concepts'
@@ -187,10 +187,13 @@ async function runScanAndReport(projectDir) {
       `${report.totalScore} / ${report.maxScore} (Grade ${report.grade})`
     )} &bull; ${report.gradeLabel}`
   );
+  const { tier1, unprotectedLockfileTokens } = report.measurements;
   p.log.message(
-    `  ${pc.bold('Est. Cache Hit Rate:')} ${pc.cyan(
-      report.cacheHitRate
-    )}  |  ${pc.bold('Token Waste Risk:')} ${report.tokenWasteRisk}`
+    `  ${pc.bold('Tier-1 Context:')} ${pc.cyan(
+      tier1 ? `${tier1.file}, ${tier1.lines} lines (~${tier1.tokens} tokens)` : 'missing'
+    )}  |  ${pc.bold('Unprotected Lockfiles:')} ${
+      unprotectedLockfileTokens > 0 ? pc.red(`~${unprotectedLockfileTokens} tokens`) : pc.green('none')
+    }`
   );
   p.log.message(`  ${pc.bold('Report Path:')} ${pc.dim(reportPath)}\n`);
 
@@ -225,7 +228,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'native',
         label: 'Claude Native LSP (Default, recommended)',
-        hint: 'Compiler-backed symbol navigation (~70% token savings)'
+        hint: 'Compiler-backed symbol navigation via a code intelligence plugin'
       },
       {
         value: 'custom',
@@ -253,7 +256,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'rtk',
         label: 'RTK — Rust Token Killer (Default, recommended)',
-        hint: 'Collapses passing tests, keeps failure diffs (~60-90% savings)'
+        hint: 'Collapses passing tests, keeps failure diffs'
       },
       {
         value: 'custom',
@@ -394,7 +397,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
   const spinner = p.spinner();
   spinner.start('Scaffolding Agent Context Forge harness into repository...');
 
-  const createdFiles = scaffoldProject(targetDir, {
+  const { files, backups, proposals } = scaffoldProject(targetDir, {
     engine,
     lsp,
     masking,
@@ -404,7 +407,17 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     projectContext
   });
 
-  spinner.stop(`Scaffolded ${createdFiles.length} files successfully!`);
+  spinner.stop(`Scaffolded ${files.length} files successfully!`);
+
+  if (backups.length > 0) {
+    p.log.info(`Backed up before changing:\n${backups.map((f) => `  ${f}`).join('\n')}`);
+  }
+  if (proposals.length > 0) {
+    p.log.warn(
+      `Kept your existing files. Our versions were written alongside them for you to merge by hand:\n` +
+        proposals.map((f) => `  ${f}`).join('\n')
+    );
+  }
 
   // Run doctor check inline if possible
   const doctorScript = path.join(targetDir, 'scripts', 'agent-gates', 'doctor.sh');

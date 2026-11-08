@@ -1,17 +1,131 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateProjectContext } from './context-generator.js';
+import { generateProjectContext, generateStarterClaudeMd } from './context-generator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(__dirname, '..');
 
+// Suffix for our version of a user-owned file we refused to overwrite. It must not end in
+// `.md`, or Claude Code would load a proposed `.claude/agents/*.md` as a duplicate agent.
+export const PROPOSAL_SUFFIX = '.context-forge-new';
+
+// Hook scripts this harness wires into settings.json. On re-install, hook entries running
+// these scripts are replaced with the current definitions; every other hook is left alone.
+const HARNESS_HOOK_SCRIPTS = [
+  'scripts/agent-gates/doctor.sh',
+  'scripts/agent-gates/session-context.sh',
+  '.claude/hooks/rewrite-rtk.sh',
+  '.claude/hooks/guard-whole-file-reads.sh',
+  '.claude/hooks/pre-commit-prefix-stability.sh',
+  '.claude/hooks/guard-subagent-isolation.py',
+  '.claude/hooks/pre-compact-handover.sh',
+  '.claude/hooks/context-stability.py'
+];
+
+// One script handles every Context Stability event (rule capture, re-injection after
+// compaction, and the gates in .claude/enforced-rules.json); see its header.
+const contextStabilityHook = {
+  type: 'command',
+  command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/context-stability.py"',
+  timeout: 10
+};
+
+const ENFORCED_RULES_STARTER = {
+  $comment:
+    'Rules Claude Code enforces with hooks instead of instructions (.claude/hooks/context-stability.py). ' +
+    'Kinds: command (when/require/forbid/unless regexes on Bash commands), path (Edit/Write denied on globs), ' +
+    'commit (ifChanged globs need a requireChanged file in the same commit), stop (checked once before Claude finishes).',
+  rules: []
+};
+
+// Read deny rules that v0.1 of this harness added. They also block Grep and `grep` on those
+// files, which made agents fail lockfile questions, so upgrades remove them; the
+// guard-whole-file-reads hook replaces them.
+const LEGACY_HARNESS_DENY_RULES = new Set([
+  'Read(**/package-lock.json)',
+  'Read(**/pnpm-lock.yaml)',
+  'Read(**/yarn.lock)',
+  'Read(**/Cargo.lock)',
+  'Read(**/poetry.lock)',
+  'Read(**/uv.lock)',
+  'Read(**/node_modules/**)',
+  'Read(**/dist/**)',
+  'Read(**/build/**)',
+  'Read(**/.next/**)',
+  'Read(**/coverage/**)',
+  'Read(**/*.min.js)',
+  'Read(**/*.min.css)',
+  'Read(**/*.map)'
+]);
+
+const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
+
+const isHarnessHook = (hook) =>
+  typeof hook?.command === 'string' &&
+  HARNESS_HOOK_SCRIPTS.some((script) => hook.command.includes(script));
+
+/**
+ * Merges the harness settings into an existing settings object without dropping anything
+ * the user configured: deny rules are unioned, and only hook entries that run this
+ * harness's own scripts are replaced.
+ */
+export function mergeSettings(existing, ours) {
+  const merged = { ...existing };
+  if (!merged.$schema) merged.$schema = ours.$schema;
+
+  // The user's env values win over ours
+  if (ours.env || existing.env) {
+    merged.env = { ...(ours.env || {}), ...(existing.env || {}) };
+  }
+
+  if (existing.permissions) {
+    merged.permissions = { ...existing.permissions };
+    if (Array.isArray(existing.permissions.deny)) {
+      const deny = existing.permissions.deny.filter((rule) => !LEGACY_HARNESS_DENY_RULES.has(rule));
+      if (deny.length > 0) {
+        merged.permissions.deny = deny;
+      } else {
+        delete merged.permissions.deny;
+      }
+    }
+    if (Object.keys(merged.permissions).length === 0) delete merged.permissions;
+  }
+
+  merged.hooks = { ...(existing.hooks || {}) };
+  for (const event of new Set([...Object.keys(merged.hooks), ...Object.keys(ours.hooks)])) {
+    const userGroups = (Array.isArray(merged.hooks[event]) ? merged.hooks[event] : [])
+      .map((group) => ({
+        ...group,
+        hooks: Array.isArray(group.hooks) ? group.hooks.filter((hook) => !isHarnessHook(hook)) : group.hooks
+      }))
+      .filter((group) => !Array.isArray(group.hooks) || group.hooks.length > 0);
+    const groups = [...userGroups, ...(ours.hooks[event] || [])];
+    if (groups.length > 0) {
+      merged.hooks[event] = groups;
+    } else {
+      delete merged.hooks[event];
+    }
+  }
+
+  return merged;
+}
+
 /**
  * Scaffolds the Agent Context Forge harness into a target directory.
  *
+ * Existing files are never silently destroyed:
+ * - `.claude/settings.json` is merged (see `mergeSettings`) and backed up before it changes.
+ * - Harness-owned scripts are replaced; local edits are kept in a `.bak` copy first.
+ * - User-owned files (CLAUDE.md, AGENTS.md, rules, agents, git hooks) are only replaced when
+ *   they are unchanged since the last install. Otherwise the user's file is kept and our
+ *   version is written next to it with the `PROPOSAL_SUFFIX` suffix.
+ *
  * @param {string} targetDir Destination folder
  * @param {object} options Selected configuration options
- * @returns {string[]} List of created or updated files relative to targetDir
+ * @returns {{files: string[], backups: string[], proposals: string[]}} Paths relative to
+ *   targetDir: files written, backups made, and proposals written beside user files
  */
 export function scaffoldProject(targetDir, options = {}) {
   const {
@@ -24,7 +138,14 @@ export function scaffoldProject(targetDir, options = {}) {
     projectContext = null
   } = options;
 
-  const createdFiles = [];
+  const result = { files: [], backups: [], proposals: [] };
+  const installedHashes = {};
+
+  const manifestPath = path.join(targetDir, '.claude', 'context-forge.json');
+  let previousHashes = {};
+  try {
+    previousHashes = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')).files || {};
+  } catch {}
 
   const ensureDir = (dirPath) => {
     if (!fs.existsSync(dirPath)) {
@@ -32,22 +153,82 @@ export function scaffoldProject(targetDir, options = {}) {
     }
   };
 
-  const copyFileWithPerms = (src, dest, isExecutable = false) => {
-    ensureDir(path.dirname(dest));
-    fs.copyFileSync(src, dest);
-    if (isExecutable) {
-      fs.chmodSync(dest, 0o755);
+  const backup = (dest) => {
+    let backupPath = `${dest}.bak`;
+    for (let i = 1; fs.existsSync(backupPath); i++) {
+      backupPath = `${dest}.bak.${i}`;
     }
-    createdFiles.push(path.relative(targetDir, dest));
+    fs.copyFileSync(dest, backupPath);
+    result.backups.push(path.relative(targetDir, backupPath));
   };
 
-  const writeFileWithPerms = (dest, content, isExecutable = false) => {
+  const write = (dest, content, isExecutable) => {
     ensureDir(path.dirname(dest));
-    fs.writeFileSync(dest, content, 'utf-8');
+    fs.writeFileSync(dest, content);
     if (isExecutable) {
       fs.chmodSync(dest, 0o755);
     }
-    createdFiles.push(path.relative(targetDir, dest));
+  };
+
+  /**
+   * @param {'harness' | 'user'} owner `harness` files are ours to upgrade (after a backup of
+   *   local edits); `user` files are never replaced once edited.
+   */
+  const install = (dest, content, { isExecutable = false, owner = 'harness' } = {}) => {
+    const rel = path.relative(targetDir, dest);
+    const hash = sha256(content);
+
+    if (fs.existsSync(dest)) {
+      const currentHash = sha256(fs.readFileSync(dest));
+      if (currentHash === hash) {
+        if (isExecutable) fs.chmodSync(dest, 0o755);
+        installedHashes[rel] = hash;
+        return;
+      }
+      const unchangedSinceLastInstall = previousHashes[rel] === currentHash;
+      if (!unchangedSinceLastInstall) {
+        if (owner === 'user') {
+          write(dest + PROPOSAL_SUFFIX, content, false);
+          result.proposals.push(rel + PROPOSAL_SUFFIX);
+          return;
+        }
+        backup(dest);
+      }
+    }
+
+    write(dest, content, isExecutable);
+    installedHashes[rel] = hash;
+    result.files.push(rel);
+  };
+
+  const copyFileWithPerms = (src, dest, isExecutable = false, owner = 'harness') =>
+    install(dest, fs.readFileSync(src), { isExecutable, owner });
+
+  const writeFileWithPerms = (dest, content, isExecutable = false, owner = 'harness') =>
+    install(dest, Buffer.from(content, 'utf-8'), { isExecutable, owner });
+
+  const installSettings = (dest, ours) => {
+    const rel = path.relative(targetDir, dest);
+    let merged = ours;
+    if (fs.existsSync(dest)) {
+      const raw = fs.readFileSync(dest, 'utf-8');
+      let existing;
+      try {
+        existing = JSON.parse(raw);
+      } catch {}
+      if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        // Unparseable settings: leave them for the user to fix, and propose ours alongside.
+        write(dest + PROPOSAL_SUFFIX, JSON.stringify(ours, null, 2) + '\n', false);
+        result.proposals.push(rel + PROPOSAL_SUFFIX);
+        return;
+      }
+      merged = mergeSettings(existing, ours);
+      const content = JSON.stringify(merged, null, 2) + '\n';
+      if (content === raw) return;
+      backup(dest);
+    }
+    write(dest, JSON.stringify(merged, null, 2) + '\n', false);
+    result.files.push(rel);
   };
 
   // 1. Build .claude/settings.json dynamically based on user choices
@@ -55,31 +236,14 @@ export function scaffoldProject(targetDir, options = {}) {
     $schema: 'https://json.schemastore.org/claude-code-settings.json'
   };
 
-  if (lsp === 'native') {
-    settings.env = {
-      ENABLE_LSP_TOOL: '1'
-    };
-  }
+  // No settings flag turns on Claude Code's LSP tool: it needs a code intelligence plugin,
+  // which the installer offers after scaffolding (see lsp-plugins.js).
 
-  // Always protect against accidental lockfile & build token bombs
-  settings.permissions = {
-    deny: [
-      'Read(**/package-lock.json)',
-      'Read(**/pnpm-lock.yaml)',
-      'Read(**/yarn.lock)',
-      'Read(**/Cargo.lock)',
-      'Read(**/poetry.lock)',
-      'Read(**/uv.lock)',
-      'Read(**/node_modules/**)',
-      'Read(**/dist/**)',
-      'Read(**/build/**)',
-      'Read(**/.next/**)',
-      'Read(**/coverage/**)',
-      'Read(**/*.min.js)',
-      'Read(**/*.min.css)',
-      'Read(**/*.map)'
-    ]
-  };
+  // rtk prints a "no hook installed" notice that only checks global settings; this project
+  // install wires it, so keep the notice out of the agent's command output.
+  if (masking === 'rtk') {
+    settings.env = { RTK_SUPPRESS_HOOK_WARNING: '1' };
+  }
 
   const bashHooks = [];
   if (masking === 'rtk') {
@@ -100,12 +264,31 @@ export function scaffoldProject(targetDir, options = {}) {
     {
       matcher: 'Bash',
       hooks: bashHooks
+    },
+    {
+      // Token-bomb protection: blocks only whole-file reads of lockfiles and bundles, so Grep and
+      // `grep` on them keep working (permissions.deny Read rules would block those too)
+      matcher: 'Read',
+      hooks: [
+        {
+          type: 'command',
+          command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-whole-file-reads.sh"',
+          timeout: 5
+        }
+      ]
     }
   ];
 
+  preToolUseList.push({
+    // Rule gates; a no-op until .claude/enforced-rules.json has rules
+    matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit',
+    hooks: [contextStabilityHook]
+  });
+
   if (subagentIsolation === 'guardrail' || subagentIsolation === 'both') {
     preToolUseList.push({
-      matcher: 'Read|Grep|Glob|Task|Write|Edit',
+      // Bash too: Claude Code searches with grep/find through Bash by default on macOS and Linux
+      matcher: 'Read|Grep|Glob|Bash|Agent|Task|Write|Edit',
       hooks: [
         {
           type: 'command',
@@ -122,12 +305,15 @@ export function scaffoldProject(targetDir, options = {}) {
         hooks: [
           {
             type: 'command',
-            command: '"$CLAUDE_PROJECT_DIR/scripts/agent-gates/doctor.sh"',
-            statusMessage: 'Checking agent context environment (LSP, RTK & Memory readiness)...'
-          }
+            command: '"$CLAUDE_PROJECT_DIR/scripts/agent-gates/session-context.sh"',
+            statusMessage: 'Loading project facts and checking the environment...'
+          },
+          // No matcher, so it also runs after compaction (source "compact") to re-inject rules
+          contextStabilityHook
         ]
       }
     ],
+    UserPromptSubmit: [{ hooks: [contextStabilityHook] }],
     PreToolUse: preToolUseList,
     PreCompact: [
       {
@@ -135,15 +321,16 @@ export function scaffoldProject(targetDir, options = {}) {
           {
             type: 'command',
             command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-handover.sh"',
-            statusMessage: 'Snapshotting active state before context compaction...'
-          }
+            statusMessage: 'Adding handover notes to the compaction summary...'
+          },
+          contextStabilityHook
         ]
       }
-    ]
+    ],
+    Stop: [{ hooks: [contextStabilityHook] }]
   };
 
-  const settingsPath = path.join(targetDir, '.claude', 'settings.json');
-  writeFileWithPerms(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  installSettings(path.join(targetDir, '.claude', 'settings.json'), settings);
 
   // 2. Copy Core Hooks
   const hooksDir = path.join(PACKAGE_ROOT, '.claude', 'hooks');
@@ -156,6 +343,22 @@ export function scaffoldProject(targetDir, options = {}) {
     path.join(hooksDir, 'pre-compact-handover.sh'),
     path.join(targetDir, '.claude', 'hooks', 'pre-compact-handover.sh'),
     true
+  );
+  copyFileWithPerms(
+    path.join(hooksDir, 'guard-whole-file-reads.sh'),
+    path.join(targetDir, '.claude', 'hooks', 'guard-whole-file-reads.sh'),
+    true
+  );
+  copyFileWithPerms(
+    path.join(hooksDir, 'context-stability.py'),
+    path.join(targetDir, '.claude', 'hooks', 'context-stability.py'),
+    true
+  );
+  writeFileWithPerms(
+    path.join(targetDir, '.claude', 'enforced-rules.json'),
+    JSON.stringify(ENFORCED_RULES_STARTER, null, 2) + '\n',
+    false,
+    'user'
   );
 
   if (masking === 'rtk') {
@@ -180,7 +383,9 @@ export function scaffoldProject(targetDir, options = {}) {
     if (fs.existsSync(orchestratorSrc)) {
       copyFileWithPerms(
         orchestratorSrc,
-        path.join(targetDir, '.claude', 'agents', 'orchestrator.md')
+        path.join(targetDir, '.claude', 'agents', 'orchestrator.md'),
+        false,
+        'user'
       );
     }
   }
@@ -190,6 +395,11 @@ export function scaffoldProject(targetDir, options = {}) {
   copyFileWithPerms(
     path.join(scriptsDir, 'doctor.sh'),
     path.join(targetDir, 'scripts', 'agent-gates', 'doctor.sh'),
+    true
+  );
+  copyFileWithPerms(
+    path.join(scriptsDir, 'session-context.sh'),
+    path.join(targetDir, 'scripts', 'agent-gates', 'session-context.sh'),
     true
   );
   copyFileWithPerms(
@@ -211,10 +421,17 @@ export function scaffoldProject(targetDir, options = {}) {
   // 5. Universal Git Hook
   const gitHookSrc = path.join(PACKAGE_ROOT, '.githooks', 'pre-commit');
   if (fs.existsSync(gitHookSrc)) {
-    copyFileWithPerms(gitHookSrc, path.join(targetDir, '.githooks', 'pre-commit'), true);
+    copyFileWithPerms(gitHookSrc, path.join(targetDir, '.githooks', 'pre-commit'), true, 'user');
   }
 
   // 6. Context Documents (Custom or Starter)
+  // Claude Code reads only CLAUDE.md when both files exist, so a CLAUDE.md next to the user's
+  // own AGENTS.md (not one this harness wrote) must import it, or those instructions stop loading.
+  const agentsMdPath = path.join(targetDir, 'AGENTS.md');
+  const userOwnsAgentsMd =
+    fs.existsSync(agentsMdPath) && previousHashes['AGENTS.md'] !== sha256(fs.readFileSync(agentsMdPath));
+  const withAgentsImport = (content) => (userOwnsAgentsMd ? `@AGENTS.md\n\n${content}` : content);
+
   if (projectContext) {
     const generated = generateProjectContext({
       ...projectContext,
@@ -223,15 +440,22 @@ export function scaffoldProject(targetDir, options = {}) {
       masking,
       episodicMemory
     });
-    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), generated.claudeMdContent);
-    writeFileWithPerms(path.join(targetDir, 'AGENTS.md'), generated.agentsMdContent);
+    writeFileWithPerms(path.join(targetDir, 'CLAUDE.md'), withAgentsImport(generated.claudeMdContent), false, 'user');
+    writeFileWithPerms(path.join(targetDir, 'AGENTS.md'), generated.agentsMdContent, false, 'user');
     writeFileWithPerms(
       path.join(targetDir, '.agents', 'rules', 'project-architecture.md'),
-      generated.architectureRuleContent
+      generated.architectureRuleContent,
+      false,
+      'user'
     );
   } else {
-    copyFileWithPerms(path.join(PACKAGE_ROOT, 'CLAUDE.md'), path.join(targetDir, 'CLAUDE.md'));
-    copyFileWithPerms(path.join(PACKAGE_ROOT, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'));
+    writeFileWithPerms(
+      path.join(targetDir, 'CLAUDE.md'),
+      withAgentsImport(generateStarterClaudeMd({ sdd })),
+      false,
+      'user'
+    );
+    copyFileWithPerms(path.join(PACKAGE_ROOT, 'AGENTS.md'), path.join(targetDir, 'AGENTS.md'), false, 'user');
     const rulesGitKeep = path.join(PACKAGE_ROOT, '.agents', 'rules', '.gitkeep');
     if (fs.existsSync(rulesGitKeep)) {
       copyFileWithPerms(rulesGitKeep, path.join(targetDir, '.agents', 'rules', '.gitkeep'));
@@ -271,12 +495,13 @@ You selected [context-mode](https://github.com/mksglu/context-mode) for advanced
     subagentIsolation,
     episodicMemory,
     sdd,
-    installedAt: new Date().toISOString()
+    installedAt: new Date().toISOString(),
+    // Hashes of the files as written, so a later upgrade can tell unedited files from edited ones
+    files: installedHashes
   };
-  writeFileWithPerms(
-    path.join(targetDir, '.claude', 'context-forge.json'),
-    JSON.stringify(manifest, null, 2) + '\n'
-  );
+  ensureDir(path.dirname(manifestPath));
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+  result.files.push(path.relative(targetDir, manifestPath));
 
-  return createdFiles;
+  return result;
 }

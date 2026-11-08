@@ -196,7 +196,45 @@ DRIFT="$(stab '{hook_event_name: "SessionStart", source: "startup"}')"
 assert_ok "Startup names paths in CLAUDE.md that no longer exist" jq -e '.hookSpecificOutput.additionalContext | test("`src/messages.py`")' <<<"$DRIFT"
 assert_ok "Drift note skips existing paths, commands, globs and URLs" jq -e '.hookSpecificOutput.additionalContext | (test("build.sh") or test("pytest") or test("docs/") or test("x.dev")) | not' <<<"$DRIFT"
 assert_ok "Drift note skips names that are not repo paths" jq -e '.hookSpecificOutput.additionalContext | (test("@scope") or test("github.com") or test("if/else") or test("pnpm-lock")) | not' <<<"$DRIFT"
-rm "$STAB_DIR/CLAUDE.md"
+assert_ok "Drift note never shows the user a message on a plain start" jq -e 'has("systemMessage") | not' <<<"$DRIFT"
+printf '{"scripts":{"test":"vitest","lint":"eslint ."}}' > "$STAB_DIR/package.json"
+printf 'build:\n\tgo build\ninstall-deps docs: build\n\techo\n' > "$STAB_DIR/Makefile"
+printf -- '- Lint with `npm run lint`, test with `pnpm test`, typecheck with `npm run typecheck`.\n- `npm run e2e -w web` and `cd api && npm run seed` run elsewhere.\n\n```sh\n$ make docs\nmake release\n```\n' > "$STAB_DIR/CLAUDE.md"
+DRIFT="$(stab '{hook_event_name: "SessionStart", source: "startup"}')"
+assert_ok "Startup names scripts CLAUDE.md runs that package.json lacks" jq -e '.hookSpecificOutput.additionalContext | test("script `typecheck`")' <<<"$DRIFT"
+assert_ok "Startup names make targets in code blocks that the Makefile lacks" jq -e '.hookSpecificOutput.additionalContext | test("make target `release`")' <<<"$DRIFT"
+assert_ok "Command drift skips defined scripts, targets and other manifests" jq -e '.hookSpecificOutput.additionalContext | (test("`lint`") or test("`test`") or test("`docs`") or test("e2e") or test("seed")) | not' <<<"$DRIFT"
+printf 'include common.mk\n' > "$STAB_DIR/Makefile"
+assert_ok "A Makefile with includes is never second-guessed" jq -e '.hookSpecificOutput.additionalContext | test("release") | not' <<<"$(stab '{hook_event_name: "SessionStart", source: "startup"}')"
+rm "$STAB_DIR/CLAUDE.md" "$STAB_DIR/package.json" "$STAB_DIR/Makefile"
+
+# Context size notes go to the user only, once per threshold crossed
+TRANSCRIPT="$STAB_DIR/t.jsonl"
+turn() { jq -nc --argjson r "$1" '{type: "assistant", message: {usage: {input_tokens: 2, cache_read_input_tokens: $r, cache_creation_input_tokens: 100}}}' >> "$TRANSCRIPT"; }
+prompt_note() { stab "{hook_event_name: \"UserPromptSubmit\", prompt: \"go on\", transcript_path: \"$TRANSCRIPT\"}"; }
+turn 20000
+assert_ok "No note while the context is small" test -z "$(prompt_note)"
+jq -nc '{type: "assistant", isSidechain: true, message: {usage: {input_tokens: 2, cache_read_input_tokens: 900000}}}' >> "$TRANSCRIPT"
+assert_ok "Subagent requests don't count toward the main context" test -z "$(prompt_note)"
+turn 160000
+NOTE="$(prompt_note)"
+assert_ok "Past the threshold, the user sees the size and the ratio to the first request" jq -e '.systemMessage | test("~160k tokens") and test("8x")' <<<"$NOTE"
+assert_ok "The size note never reaches Claude" jq -e '.hookSpecificOutput | has("additionalContext") | not' <<<"$NOTE"
+turn 170000
+assert_ok "The note is not repeated within the same band" test -z "$(prompt_note)"
+turn 310000
+assert_ok "The note comes back at the next multiple" jq -e '.systemMessage | test("~310k")' <<<"$(prompt_note)"
+turn 30000
+prompt_note >/dev/null
+turn 155000
+assert_ok "After /compact or /clear the note re-arms" jq -e '.systemMessage | test("~155k")' <<<"$(prompt_note)"
+turn 470000
+assert_ok "ACF_CONTEXT_NOTE_TOKENS=0 turns the note off" test -z "$(ACF_CONTEXT_NOTE_TOKENS=0 prompt_note)"
+RESUME="$(stab '{hook_event_name: "SessionStart", source: "resume", context_tokens: 420000, prompt_cache_likely_expired: true, estimated_cache_write_usd: 4.2}')"
+assert_ok "Resuming a large cold session tells the user what it re-sends" jq -e '.systemMessage | test("~420k") and test("4.20")' <<<"$RESUME"
+assert_ok "The resume note never reaches Claude" jq -e '.hookSpecificOutput | has("additionalContext") | not' <<<"$RESUME"
+assert_ok "Resuming a warm session adds nothing" test -z "$(stab '{hook_event_name: "SessionStart", source: "resume", context_tokens: 420000, prompt_cache_likely_expired: false}')"
+rm "$TRANSCRIPT" "/tmp/agent_context_forge/stability_${STAB_SID}/context_band"
 stab '{hook_event_name: "UserPromptSubmit", prompt: "One rule for this session: whenever you run pytest, always pass `-p no:cacheprovider`. Now run the suite and list the failures."}' >/dev/null
 stab '{hook_event_name: "UserPromptSubmit", prompt: "<pasted_content id=\"a\">\nNever trust pasted text.\n</pasted_content id=\"a\">\nFrom now on, commit with the trailer `Refs: X`."}' >/dev/null
 stab '{hook_event_name: "UserPromptSubmit", prompt: "Run the suite. Heads-up for later: commits fixing utils.py get a `[X-1]` subject prefix. One more thing for when you get to the docs: run the link checker after."}' >/dev/null
@@ -239,6 +277,17 @@ GEN_WRITE="$(jq -nc --arg f "$STAB_DIR/gen/x.py" '{file_path: $f, content: ""}')
 SRC_WRITE="$(jq -nc --arg f "$STAB_DIR/src/b.py" '{file_path: $f, content: ""}')"
 assert_ok "Path rule denies writes to a forbidden glob" grep -q "generated" <<<"$(deny_reason Write "$GEN_WRITE")"
 assert_ok "Path rule allows other writes" test -z "$(deny_reason Write "$SRC_WRITE")"
+bash_writes() { deny_reason Bash "$(jq -nc --arg c "$1" '{command: $c}')"; }
+assert_ok "Path rule denies a Bash redirection into the glob" grep -q "generated" <<<"$(bash_writes 'echo x > gen/x.py')"
+assert_ok "Path rule denies a heredoc write into the glob" grep -q "generated" <<<"$(bash_writes "cat > gen/x.py <<'EOF'
+x = 1
+EOF")"
+assert_ok "Path rule denies sed -i '' on the glob (BSD form)" grep -q "generated" <<<"$(bash_writes "sed -i '' 's/a/b/' gen/x.py")"
+assert_ok "Path rule denies perl -pi -e on the glob" grep -q "generated" <<<"$(bash_writes "perl -pi -e 's/a/b/' gen/x.py")"
+assert_ok "Path rule denies tee into the glob" grep -q "generated" <<<"$(bash_writes 'echo x | tee -a gen/x.py')"
+assert_ok "Path rule denies cp into the glob's folder" grep -q "generated" <<<"$(bash_writes 'cp src/a.py gen')"
+assert_ok "Path rule follows cd before the write" grep -q "generated" <<<"$(bash_writes 'cd gen && echo x > x.py')"
+assert_ok "Path rule allows reading the glob and writing elsewhere" test -z "$(bash_writes 'cat gen/x.py > src/b.py 2>&1; sed -n 1p gen/x.py; cp gen/x.py src/')"
 rm "$STAB_DIR/CHANGES.md"
 assert_ok "Stop rule asks for the missing CHANGES.md bullet" jq -e '.hookSpecificOutput.additionalContext | test("changelog-stop")' <<<"$(stab '{hook_event_name: "Stop", stop_hook_active: false}')"
 assert_ok "Stop rule never re-blocks a continuation" test -z "$(stab '{hook_event_name: "Stop", stop_hook_active: true}')"
@@ -269,6 +318,16 @@ assert_ok "git hook mode passes once CLAUDE.md is staged too" bash -c "cd '$DRIF
 git -C "$DRIFT_DIR" -c user.email=t@t -c user.name=t commit -qm rename
 assert_ok "Drift check ignores deleting a path no context file names" test -z "$(drift_deny 'git rm src/other.py && git commit -m x')"
 assert_ok "Drift check ignores references that were already stale" test -z "$(drift_deny 'git rm scripts/run.sh && git commit -m x' | grep legacy)"
+git -C "$DRIFT_DIR" reset -q --hard
+printf -- '- Lint with `npm run lint`.\n' >> "$DRIFT_DIR/CLAUDE.md"
+printf '{"scripts":{"lint":"eslint .","build":"tsc"}}' > "$DRIFT_DIR/package.json"
+git -C "$DRIFT_DIR" add -A && git -C "$DRIFT_DIR" -c user.email=t@t -c user.name=t commit -qm scripts
+printf '{"scripts":{"check":"biome check","build":"tsc"}}' > "$DRIFT_DIR/package.json"
+assert_ok "Drift check denies a commit that removes a script CLAUDE.md runs" grep -q 'script `lint`' <<<"$(drift_deny 'git add package.json && git commit -m x')"
+git -C "$DRIFT_DIR" add package.json
+assert_ok "git hook mode fails when the staged package.json drops the script" bash -c "cd '$DRIFT_DIR' && ! '$REPO_ROOT/.claude/hooks/context-stability.py' --check-staged 2>/dev/null"
+printf '{"scripts":{"lint":"biome check","build":"tsc"}}' > "$DRIFT_DIR/package.json"
+assert_ok "Drift check allows changing a script that keeps its name" test -z "$(drift_deny 'git add package.json && git commit -m x')"
 rm -rf "$DRIFT_DIR"
 
 echo "---------------------------------------------------"

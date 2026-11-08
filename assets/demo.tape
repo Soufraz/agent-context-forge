@@ -2,7 +2,7 @@
 Output assets/demo.gif
 
 Set FontSize 14
-Set Width 980
+Set Width 1120
 Set Height 700
 Set Padding 20
 Set Theme "TokyoNight"
@@ -10,7 +10,7 @@ Set WindowBar Colorful
 Set TypingSpeed 45ms
 
 Hide
-Type "rm -rf ~/demo-app && mkdir -p ~/demo-app && cd ~/demo-app && export PS1='demo-app ❯ ' && clear"
+Type "rm -rf ~/demo-app && mkdir -p ~/demo-app && cd ~/demo-app && export npm_config_yes=true PS1='demo-app ❯ ' && clear"
 Enter
 Sleep 300ms
 Show

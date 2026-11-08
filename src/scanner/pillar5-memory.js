@@ -79,10 +79,10 @@ export function auditPillar5(projectDir) {
   }
 
   // 2. Compaction handover hook (7 pts): any working PreCompact hook, or a SessionStart hook
-  //    that runs after compaction (matcher `compact`)
+  //    that runs after compaction: matcher `compact`, or omitted, "" or "*", which match every source
   const compactionHooks = [
     ...hookCommands(layers, 'PreCompact'),
-    ...hookCommands(layers, 'SessionStart').filter((hook) => /compact/.test(hook.matcher))
+    ...hookCommands(layers, 'SessionStart').filter((hook) => ['', '*'].includes(hook.matcher) || /compact/.test(hook.matcher))
   ];
   const hasPreCompactHook = compactionHooks.some((hook) => projectScriptStatus(projectDir, hook.command).ok);
 

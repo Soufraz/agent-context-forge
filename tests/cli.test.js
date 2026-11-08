@@ -11,6 +11,7 @@ import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 import { auditPillar2 } from '../src/scanner/pillar2-disclosure.js';
+import { auditPillar5 } from '../src/scanner/pillar5-memory.js';
 import {
   auditPillar4,
   parseAgentFrontmatter,
@@ -274,6 +275,24 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ndisallowedTools: Edit, Write\n---\n')), []);
     assert.deepEqual(writeToolsGranted(parseAgentFrontmatter('---\nname: o\ntools:\n  - Read\n  - Edit\n---\n')), ['Edit']);
 
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('auditPillar5: a SessionStart hook with no matcher also runs after compaction', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_pillar5_'));
+    fs.mkdirSync(path.join(tmpProject, '.claude'));
+    const withMatcher = (matcher) => {
+      const group = { hooks: [{ type: 'command', command: 'echo facts' }] };
+      if (matcher !== undefined) group.matcher = matcher;
+      fs.writeFileSync(path.join(tmpProject, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [group] } }));
+      return auditPillar5(tmpProject).findings.some((f) => f.title.includes('Lossy Compaction Protection Active'));
+    };
+    // Omitted, "" and "*" match every source, compact included (code.claude.com/docs/en/hooks)
+    assert.equal(withMatcher(undefined), true);
+    assert.equal(withMatcher(''), true);
+    assert.equal(withMatcher('*'), true);
+    assert.equal(withMatcher('startup|compact'), true);
+    assert.equal(withMatcher('startup'), false);
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 

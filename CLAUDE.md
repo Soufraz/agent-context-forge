@@ -14,8 +14,8 @@
 - **Subagent Context Isolation:** Keep the primary session context flat. If an investigation requires 15+ exploratory `Read`, `Grep`, or `Glob` calls, delegate the exploration to a fresh subagent (`Agent` tool) and return only a concise synthesis with exact `file:line` pointers.
 
 ## 3. Repository Structure & On-Demand Pointers
-- `.claude/settings.json` — Hook bindings (`SessionStart`, `PreToolUse`, `PreCompact`), including the whole-file read guard for lockfiles and bundles.
-- `.claude/hooks/` — Automated guardrails for prefix stability, subagent isolation, and command compression.
+- `.claude/settings.json` — Hook bindings (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PreCompact`, `Stop`), including the whole-file read guard for lockfiles and bundles.
+- `.claude/hooks/` — Automated guardrails for prefix stability, subagent isolation, command compression, and context stability (rules captured across compaction, rule gates from `.claude/enforced-rules.json`).
 - `scripts/agent-gates/` — Portable environment health checks for LSP, `rtk`, and Episodic Auto-Memory.
 - `.agents/rules/` — Portable cross-agent rule definitions.
 - `.githooks/` — Standard Git hook wrappers for CLI and IDE commits.

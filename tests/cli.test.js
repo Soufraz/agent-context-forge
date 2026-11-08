@@ -91,6 +91,18 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.ok(settings.hooks.PreToolUse);
     assert.ok(settings.hooks.PreCompact);
 
+    // Context Stability: one script on every event it handles, and a starter rules file
+    const runsStability = (event) =>
+      settings.hooks[event].some((g) => g.hooks.some((h) => h.command.includes('context-stability.py')));
+    for (const event of ['SessionStart', 'UserPromptSubmit', 'PreCompact', 'PreToolUse', 'Stop']) {
+      assert.ok(runsStability(event), `context-stability.py must run on ${event}`);
+    }
+    assert.equal(settings.hooks.SessionStart[0].matcher, undefined, 'SessionStart must also fire after compaction');
+    const rulesFile = JSON.parse(fs.readFileSync(path.join(tmpProject, '.claude', 'enforced-rules.json'), 'utf-8'));
+    assert.deepEqual(rulesFile.rules, []);
+    const stabilityStat = fs.statSync(path.join(tmpProject, '.claude', 'hooks', 'context-stability.py'));
+    assert.equal(stabilityStat.mode & 0o111, 0o111, 'context-stability.py must be executable');
+
     // Check script permissions (0755)
     const doctorStat = fs.statSync(path.join(tmpProject, 'scripts', 'agent-gates', 'doctor.sh'));
     assert.equal(doctorStat.mode & 0o111, 0o111, 'doctor.sh must be executable');

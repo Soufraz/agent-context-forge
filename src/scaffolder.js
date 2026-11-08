@@ -20,8 +20,25 @@ const HARNESS_HOOK_SCRIPTS = [
   '.claude/hooks/guard-whole-file-reads.sh',
   '.claude/hooks/pre-commit-prefix-stability.sh',
   '.claude/hooks/guard-subagent-isolation.py',
-  '.claude/hooks/pre-compact-handover.sh'
+  '.claude/hooks/pre-compact-handover.sh',
+  '.claude/hooks/context-stability.py'
 ];
+
+// One script handles every Context Stability event (rule capture, re-injection after
+// compaction, and the gates in .claude/enforced-rules.json); see its header.
+const contextStabilityHook = {
+  type: 'command',
+  command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/context-stability.py"',
+  timeout: 10
+};
+
+const ENFORCED_RULES_STARTER = {
+  $comment:
+    'Rules Claude Code enforces with hooks instead of instructions (.claude/hooks/context-stability.py). ' +
+    'Kinds: command (when/require/forbid/unless regexes on Bash commands), path (Edit/Write denied on globs), ' +
+    'commit (ifChanged globs need a requireChanged file in the same commit), stop (checked once before Claude finishes).',
+  rules: []
+};
 
 // Read deny rules that v0.1 of this harness added. They also block Grep and `grep` on those
 // files, which made agents fail lockfile questions, so upgrades remove them; the
@@ -262,6 +279,12 @@ export function scaffoldProject(targetDir, options = {}) {
     }
   ];
 
+  preToolUseList.push({
+    // Rule gates; a no-op until .claude/enforced-rules.json has rules
+    matcher: 'Bash|Edit|Write|MultiEdit|NotebookEdit',
+    hooks: [contextStabilityHook]
+  });
+
   if (subagentIsolation === 'guardrail' || subagentIsolation === 'both') {
     preToolUseList.push({
       // Bash too: Claude Code searches with grep/find through Bash by default on macOS and Linux
@@ -284,10 +307,13 @@ export function scaffoldProject(targetDir, options = {}) {
             type: 'command',
             command: '"$CLAUDE_PROJECT_DIR/scripts/agent-gates/session-context.sh"',
             statusMessage: 'Loading project facts and checking the environment...'
-          }
+          },
+          // No matcher, so it also runs after compaction (source "compact") to re-inject rules
+          contextStabilityHook
         ]
       }
     ],
+    UserPromptSubmit: [{ hooks: [contextStabilityHook] }],
     PreToolUse: preToolUseList,
     PreCompact: [
       {
@@ -296,10 +322,12 @@ export function scaffoldProject(targetDir, options = {}) {
             type: 'command',
             command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact-handover.sh"',
             statusMessage: 'Adding handover notes to the compaction summary...'
-          }
+          },
+          contextStabilityHook
         ]
       }
-    ]
+    ],
+    Stop: [{ hooks: [contextStabilityHook] }]
   };
 
   installSettings(path.join(targetDir, '.claude', 'settings.json'), settings);
@@ -320,6 +348,17 @@ export function scaffoldProject(targetDir, options = {}) {
     path.join(hooksDir, 'guard-whole-file-reads.sh'),
     path.join(targetDir, '.claude', 'hooks', 'guard-whole-file-reads.sh'),
     true
+  );
+  copyFileWithPerms(
+    path.join(hooksDir, 'context-stability.py'),
+    path.join(targetDir, '.claude', 'hooks', 'context-stability.py'),
+    true
+  );
+  writeFileWithPerms(
+    path.join(targetDir, '.claude', 'enforced-rules.json'),
+    JSON.stringify(ENFORCED_RULES_STARTER, null, 2) + '\n',
+    false,
+    'user'
   );
 
   if (masking === 'rtk') {

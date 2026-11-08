@@ -1,0 +1,13 @@
+{
+  "$comment": "Rules Claude Code enforces with hooks instead of instructions (.claude/hooks/context-stability.py). Kinds: command (when/require/forbid/unless regexes on Bash commands), path (Edit/Write denied on globs), commit (ifChanged globs need a requireChanged file in the same commit), stop (checked once before Claude finishes).",
+  "rules": [
+    {
+      "id": "conventional-commit",
+      "kind": "command",
+      "when": "\\bgit\\s+(?:-C\\s+\\S+\\s+)?commit\\b",
+      "unless": "--no-edit",
+      "require": "(?:^|[\\s\"'(])(?:feat|fix|docs|refactor|test|chore)(?:\\([^)]*\\))?!?:\\s",
+      "message": "Commit subjects start with `feat:`, `fix:`, `docs:`, `refactor:` or `test:` (CLAUDE.md section 4)."
+    }
+  ]
+}

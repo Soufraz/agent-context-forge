@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Universal Git Pre-Commit Hook (Pillar 1: Prefix Stability)
-# Enables the same Prefix Stability & Cache Optimization check for standard Git
-# commits outside Claude Code (CLI, VS Code, Cursor, Zed, Aider, OpenCode).
+# Universal Git Pre-Commit Hook
+# Brings the harness's commit checks to standard Git commits outside Claude Code (CLI, VS Code,
+# Cursor, Zed, Aider, OpenCode):
+#   1. Context drift (every commit, no model, no tokens): fails a commit that deletes or renames
+#      a path CLAUDE.md, AGENTS.md or .claude/rules still name.
+#   2. Prefix Stability & Cache Optimization (Pillar 1): a model audit, only when the commit
+#      changes context files.
 #
 # Activate in your repository with:
 #   git config core.hooksPath .githooks
@@ -9,6 +13,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+if [ -x "$REPO_ROOT/.claude/hooks/context-stability.py" ]; then
+  "$REPO_ROOT/.claude/hooks/context-stability.py" --check-staged
+fi
 
 # Skip fast if no context files are staged or modified in this commit
 if ! git diff --cached --name-only | grep -qE '^(CLAUDE\.md|AGENTS\.md|\.claude/|\.agents/)'; then

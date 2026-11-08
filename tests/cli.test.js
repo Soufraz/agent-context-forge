@@ -10,6 +10,7 @@ import { generateProjectContext } from '../src/context-generator.js';
 import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
+import { buildUsageReport, formatUsageReport, projectTranscriptDir } from '../src/usage-report.js';
 import { auditPillar2 } from '../src/scanner/pillar2-disclosure.js';
 import { auditPillar5 } from '../src/scanner/pillar5-memory.js';
 import {
@@ -264,6 +265,57 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.ok(!generateProjectContext({ projectName: 'X' }).agentsMdContent.includes('LSP Navigation'));
     fs.rmSync(plain, { recursive: true, force: true });
     fs.rmSync(chosen, { recursive: true, force: true });
+  });
+
+  test('usage report: reads transcripts, counts each response once and skips subagents', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_usage_'));
+    const project = '/work/my.app';
+    const dir = projectTranscriptDir(project, home);
+    assert.equal(path.basename(dir), '-work-my-app');
+    fs.mkdirSync(dir, { recursive: true });
+    const turn = (id, read, write1h, out, extra = {}) =>
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-11-08T10:00:00Z',
+        message: {
+          id,
+          usage: {
+            input_tokens: 0,
+            cache_read_input_tokens: read,
+            cache_creation_input_tokens: write1h,
+            cache_creation: { ephemeral_1h_input_tokens: write1h, ephemeral_5m_input_tokens: 0 },
+            output_tokens: out
+          }
+        },
+        ...extra
+      });
+    fs.writeFileSync(
+      path.join(dir, 's1.jsonl'),
+      [
+        turn('m1', 0, 50_000, 100),
+        turn('m1', 0, 50_000, 100), // a second content block of the same response
+        turn('sub', 900_000, 0, 10, { isSidechain: true }),
+        JSON.stringify({ type: 'system', subtype: 'compact_boundary' }),
+        turn('m2', 250_000, 0, 200)
+      ].join('\n')
+    );
+    fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify({ autoCompactEnabled: false }));
+
+    const report = buildUsageReport({ projectDir: project, home });
+    assert.equal(report.sessions.length, 1);
+    assert.equal(report.requests, 2);
+    assert.equal(report.medianFirstPrompt, 50_000);
+    assert.equal(report.peakContext, 250_000);
+    assert.equal(report.compactions, 1);
+    assert.equal(report.settings.autoCompact, false);
+    // re-sent 250k x 0.1 = 25k, written 50k x 2 = 100k, output 300 x 5 = 1.5k
+    assert.ok(Math.abs(report.share.cacheWrite1h - 100_000 / 126_500) < 1e-9);
+    const text = formatUsageReport(report);
+    assert.ok(text.includes('Auto-compaction is off'));
+    assert.ok(text.includes('fixed prompt is ~50k'));
+    assert.ok(formatUsageReport(buildUsageReport({ projectDir: '/nothing', home })).startsWith('No Claude Code sessions'));
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
   test('auditPillar1: dead path check flags missing files, not expressions or generated output', () => {

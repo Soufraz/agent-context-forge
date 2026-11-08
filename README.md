@@ -75,6 +75,17 @@ The failure modes below are what each pillar targets:
 | **4. Runaway Inline Exploration** | The primary agent executes 25+ consecutive `Grep`/`Read` calls inline, suffering *"lost-in-the-middle"* attention decay before writing a line of code. | **Pillar 4 (Context Isolation):** A lightweight Python state machine counts consecutive searches and reads in the primary session (including `grep`/`find` through Bash) and, every `15`, adds a non-blocking note suggesting a subagent. |
 | **5. Lossy `/compact` Amnesia** | When the window fills up and `/compact` runs, default summarization strips away exact `file:line` pointers and active root-cause hypotheses. | **Pillar 5 (Episodic Memory):** Pairs two-tier Auto-Memory (`MEMORY.md` index + lazy topic files) with a `PreCompact` handover hook that feeds active git state and preservation rules into the compaction summary. |
 
+### 4. Shows where your tokens actually go
+
+```bash
+npx agent-context-forge usage          # this project's sessions, last 30 days
+npx agent-context-forge usage --all    # every project; --days N, --json
+```
+
+It reads the session transcripts Claude Code keeps in `~/.claude/projects` and prints, for the last 30 days, the share of cost that re-sent context, cache writes, output and fresh input take (at standard price ratios, not dollars), the fixed prompt on a session's first request, the context size per request, compactions, and the costliest sessions. It suggests a change only where the numbers call for one. No model, no network. Subagent transcripts are not counted.
+
+Why this matters more than output compression: Claude Code re-sends the whole conversation on every request, so a long session pays for its context size times its number of requests. In 40 real sessions on one machine, re-sent context was 63% of cost, sessions of 100+ requests averaged 286k tokens per request, the fixed prompt (plugins, skills, MCP servers) was 55–74k tokens before any work, and tool output was 8–22% of the context. Compressing 20% of that slice moves the bill by about 2%. The usual levers are `/clear` between tasks, earlier compaction, a smaller fixed prompt, and the model choice.
+
 ---
 
 ## 🧠 Core Architecture: Context Window = RAM, Repo = Disk

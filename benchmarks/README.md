@@ -59,10 +59,31 @@ These come from reading the transcripts; the harness was tested as a bundle.
 
 ### Where it costs more
 
-- **Lockfile question (+22%).** Both conditions answer correctly. On a ~$0.05 task, the
-  harness's fixed overhead (+300 to +850 tokens per request) shows up as cost.
+- **Lockfile question (+22%).** Both conditions answer correctly. Most of this turned out to
+  be the benchmark's own setup, not the harness: see the next section.
 - **The LSP rule (+49% on Sonnet, +51% on Haiku).** It's worth it only where exact answers
-  matter more than cost, and only on Sonnet.
+  matter more than cost, and only on Sonnet. Since then it is opt-in.
+
+## LSP-rule ablation and the fresh-folder artifact (6 paired runs per arm, Sonnet unless noted)
+
+The harness arm here is the 0.2.1 harness without the `CLAUDE.md` LSP references line (the
+plugin stays installed on the date-fns task), which is the new default.
+
+| Task | Fresh folder per run | Fixed folder per arm | Correct (base / harness) |
+|---|---|---|---|
+| Lockfile question | +18% (+13 to +22) | **−21% (−29 to −13)**, cheaper in 6/6 pairs | 6/6 / 6/6 |
+| Find callers (date-fns) | +34% (+25 to +42) | +11% (−2 to +22) | 0/6 / 0/6, then 1/6 / 1/6 |
+| Find callers (date-fns), Haiku | −2% (−14 to +10) | not rerun | 0/6 / 0/6 |
+
+**Why the folder matters.** Claude Code labels the loaded `CLAUDE.md` with its path, and that
+block sits early in the prompt. Every earlier round copied each run into a new timestamped
+folder, so the harness's first request missed the cache from that block on (6.6k tokens written
+vs the baseline's 3.5k, whose `AGENTS.md` loads later). Run twice in the same folder, both arms
+write nothing on the second run. A real project keeps its path, so the fixed-folder column is the
+realistic one. In it, rep 0 warms each arm's cache and is left out. Removing the LSP rule alone
+did not remove the fresh-folder overhead; the fixed folder did. Earlier rounds' small-task
+overheads carry the same bias. Data: `results-v5-nolsp`, `results-v5-fixed`; probe:
+`bench/cache-probe.sh`.
 
 ## Round 2 and the benchmark bug
 

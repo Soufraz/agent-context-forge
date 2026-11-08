@@ -45,7 +45,7 @@ npx agent-context-forge
 - **Tool output:** 14–25% less on the click tasks (fixing failing tests on Sonnet and Haiku, a six-prompt session on Sonnet).
 - **Fewer wasted turns:** on Sonnet, the project facts removed every failed attempt to find the test command.
 - **No clear cost saving on any task:** cost changes ranged from −9% to +6%, each with a 90% interval that includes zero.
-- **Higher cost where there is little to save:** +22% on a one-question lockfile task.
+- **Higher cost where there is little to save:** +22% on a one-question lockfile task, but that came mostly from the benchmark copying each run into a new folder. With one folder per arm, as in a real project, the default setup (without the LSP rule) cost 21% less on that task (−29 to −13%) and +11% (−2 to +22%) on finding callers. [Details](benchmarks/README.md#lsp-rule-ablation-and-the-fresh-folder-artifact-6-paired-runs-per-arm-sonnet-unless-noted).
 - **The LSP references rule:** +49% on Sonnet, where it gave the only exact answers (2 of 6 runs), and +51% on Haiku, with no gain. It is now opt-in: the default setup leaves it out.
 
 An earlier round reported 10–35% savings; a benchmark bug inflated them. Tables with 90% confidence intervals, the tasks and graders, every run, and the bug: [benchmarks/](benchmarks/README.md).

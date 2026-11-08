@@ -5,7 +5,7 @@
 
 # 🛠️ Agent Context Forge
 
-**An open-source harness for Claude Code that turns your project's checkable rules into hooks an agent can't skip, catches the commit that makes `CLAUDE.md` wrong, and trims context cost, with every claim measured.**
+**An open-source starter for Claude Code: one command sets up a repo with the tools that measurably help, plus hooks that keep that setup true as the repo changes.**
 
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#the-5-pillars-under-the-hood)
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
@@ -29,20 +29,32 @@ npx agent-context-forge
   <img src="assets/demo.gif" alt="Agent Context Forge Interactive CLI Scaffolding Demo" width="900">
 </p>
 
-* **In an existing codebase:** Audits your repository across the 5 Pillars of Context Engineering in `< 2 seconds` and opens a self-contained, dark-mode **HTML Context Health Dashboard** in your browser.
-* **In an empty folder (or when installing):** Launches an interactive stack wizard to configure native LSP symbol navigation, [`rtk`](https://github.com/rtk-ai/rtk) test output compression, runaway exploration guardrails, episodic memory, and optional SDD rules.
+* **In an existing codebase:** Audits your repository across the 5 Pillars of Context Engineering in `< 2 seconds` and opens a self-contained, dark-mode **HTML Context Health Dashboard** in your browser, or installs the setup there.
+* **In an empty folder (or when installing):** Launches an interactive stack wizard to configure native LSP symbol navigation, [`rtk`](https://github.com/rtk-ai/rtk) test output compression, an exploration note, episodic memory, and optional SDD rules.
 
 ---
 
-## 🎯 What It Guarantees, and What We Measured
+## 🎯 What It Does, and What We Measured
 
-Models are good at following instructions, and Claude Code is good at keeping them: in our pilot runs (Claude Code 2.1.308, one run per arm), Sonnet kept all seven rules of a session through one and through three compactions, and ignored stale `CLAUDE.md` lines when the code beside the edit showed they were wrong. So this harness does not promise that agents remember more. It promises things that hold whatever the model does:
+### 1. Sets up the tools that help
 
-| Promise | How | Evidence |
-| :--- | :--- | :--- |
-| **Checkable rules are enforced, not hoped for** | Rules in `.claude/enforced-rules.json` become hooks: required or forbidden commands, protected paths, files that must change in the same commit, checks before Claude finishes. A denial names the rule and the fix. | Enforcement holds by construction and is covered by the test suite. Turning instruction files into executable checks raised compliance from 67% to 88% in [ContextCov](https://arxiv.org/abs/2603.00822). |
-| **Context files stay true to the code** | A commit that deletes or renames a path `CLAUDE.md`, `AGENTS.md` or `.claude/rules` still name is stopped, in Claude Code and (with `core.hooksPath`) in plain git, naming the new path. At session start, paths that are already gone are named to Claude. No model, no tokens. | Replayed over 4,269 commits with context files (agent-context-forge, echo, pydantic-ai): it fired once, on a real rename that left pydantic-ai's `CLAUDE.md` wrong for 37 commits. No false notes on next.js, n8n, ruff, pydantic-ai or echo. |
-| **Context costs less on the tasks that bloat it** | Bash output compressed through `rtk`, whole-file lockfile reads blocked, stable project facts at session start. | Paired runs on real repos, 6 pairs per task, measured on the v2 harness: fixing failing tests −10% cost on Sonnet (and 5/6 → 6/6 correct), −35% on Haiku; code exploration −12% on Sonnet. A one-question lockfile task cost +23%. |
+`npx agent-context-forge` asks a few questions and writes the setup into a new or existing repo: a lean `CLAUDE.md` that imports your `AGENTS.md`, [`rtk`](https://github.com/rtk-ai/rtk) to compress Bash output, stable project facts at session start (how this project runs its tests, BSD `sed`), a guard on whole-file reads of lockfiles and bundles, a note that suggests a subagent during long searches, Auto-Memory checks with a compaction handover, and an optional planning methodology. It offers to install `rtk` and your language server, and points you to Claude Code's code intelligence (LSP) plugin for your language.
+
+**Measured** in paired runs on real repos (6 pairs per task, on the v2 harness): fixing failing tests cost 10% less on Sonnet (and went from 5/6 to 6/6 correct) and 35% less on Haiku; code exploration cost 12% less on Sonnet. It costs more where there is little to save: +23% on a one-question lockfile task, and the LSP references rule cost +49% on Sonnet (it bought the only exact answers) and +21% on Haiku (no gain). Six-prompt sessions showed no significant difference.
+
+### 2. Keeps the setup true as the repo changes
+
+Models are good at following instructions, and Claude Code is good at keeping them: in our pilot runs (Claude Code 2.1.308, one run per arm), Sonnet kept all seven rules of a session through one and through three compactions, and ignored stale `CLAUDE.md` lines when the code beside the edit showed they were wrong. So these hooks don't promise that agents remember more. They check things that hold whatever the model does, and each one says where it stops:
+
+| Hook | What it does | Where it stops | Evidence |
+| :--- | :--- | :--- | :--- |
+| **Rule gates** | Rules in `.claude/enforced-rules.json` block the matching tool call: Bash commands that must or must not contain something, Edit/Write on protected paths, files that must change in the same commit, a check before Claude finishes. A denial names the rule and the fix. | Gates see tool calls, not intent: a write through Bash (`sed -i`, `>`) passes a path rule, and a command run inside a script passes a command rule. | Holds by construction and is covered by the test suite. Turning instruction files into executable checks raised compliance from 67% to 88% in [ContextCov](https://arxiv.org/abs/2603.00822). |
+| **Drift check** | Stops a commit that deletes or renames a path `CLAUDE.md`, `AGENTS.md` or `.claude/rules` still name, in Claude Code and (with `core.hooksPath`) in plain git, naming the new path. At session start, tells Claude which named paths are already gone. No model, no tokens. | Paths only: a stale convention, command or symbol passes. | Replayed over 4,269 commits with context files (agent-context-forge, echo, pydantic-ai): it fired once, on a real rename that left pydantic-ai's `CLAUDE.md` wrong for 37 commits. No false notes on next.js, n8n, ruff, pydantic-ai or echo. |
+| **Rule capture** | Keeps the rules you state in chat and re-injects them word for word after compaction. | Only sentences phrased as rules ("always ...", "never ...", "from now on ..."). | No measured gain: in the pilots above, Claude Code already kept every rule. A safeguard for longer sessions. |
+
+### 3. Audits a repo you already have
+
+Run inside an existing repository, it scores the setup against the five pillars in under 2 seconds and opens a self-contained HTML report. No model, no network. The score is a setup checklist, not a benchmark.
 
 The failure modes below are what each pillar targets:
 
@@ -153,8 +165,8 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 ### Context Stability: Rules That Outlive Compaction, Rule Gates, and Drift Notes
 * **Files:** [`.claude/hooks/context-stability.py`](.claude/hooks/context-stability.py) + `.claude/enforced-rules.json`
 * **Rule capture:** on `UserPromptSubmit`, keeps the sentences of your prompts that state a rule ("always ...", "never ...", "from now on ...", "heads-up for later ...") in a per-session file under `/tmp/agent_context_forge/`. Before compaction, `PreCompact` asks the summary to carry them word for word; after it, `SessionStart` (source `compact`) re-injects them word for word, so they no longer depend on the summary. CLAUDE.md itself is reloaded by Claude Code after compaction.
-* **Rule gates:** the checkable rules in `.claude/enforced-rules.json` are enforced by hooks instead of instructions. `command` rules check Bash commands (`when` / `require` / `forbid` / `unless` regexes, including `git commit -F` message files); `path` rules deny Edit/Write on globs; `commit` rules require a file in the same commit (for example `CHANGES.md` whenever `src/*` changes, counting `git add` in the same command); `stop` rules are checked once before Claude finishes. A denial names the rule and how to comply. Commits in other repositories are left alone.
-* **Drift check at commit time:** a commit that deletes or renames a path still named by `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` or `.claude/rules/*.md` is denied until the instruction file is updated in the same commit; the message names the new path of a rename. It counts `git rm`, `git mv`, `git add` and `git commit -a` in the same command. Only paths the commit removes count, so references that were already stale never block unrelated work. Outside Claude Code, `.githooks/pre-commit` runs the same check (`context-stability.py --check-staged`) once you set `git config core.hooksPath .githooks`.
+* **Rule gates:** the checkable rules in `.claude/enforced-rules.json` are enforced by hooks instead of instructions. `command` rules check Bash commands (`when` / `require` / `forbid` / `unless` regexes, including `git commit -F` message files); `path` rules deny Edit/Write on globs; `commit` rules require a file in the same commit (for example `CHANGES.md` whenever `src/*` changes, counting `git add` in the same command); `stop` rules are checked once before Claude finishes. A denial names the rule and how to comply. Commits in other repositories are left alone. Gates see tool calls, not intent: a write made through Bash (`sed -i`, `>`, a script) is not a `path` rule's Edit/Write, and a command run inside a script is not the command a `command` rule reads.
+* **Drift check at commit time:** a commit that deletes or renames a path still named by `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` or `.claude/rules/*.md` is denied until the instruction file is updated in the same commit; the message names the new path of a rename. It counts `git rm`, `git mv`, `git add` and `git commit -a` in the same command. Only paths the commit removes count, so references that were already stale never block unrelated work. Only paths: a convention, command or symbol that goes stale is not caught. Outside Claude Code, `.githooks/pre-commit` runs the same check (`context-stability.py --check-staged`) once you set `git config core.hooksPath .githooks`.
 * **Drift note:** at session start, names backticked paths in those files that no longer exist, and tells Claude to trust the code over those lines. A path counts only when its first directory exists in the repo and it is neither the tail of a tracked path nor git-ignored, so package names, URLs and examples don't trigger it (no false notes on next.js, n8n, ruff, pydantic-ai or echo). Startup adds nothing when there is no drift, so the prompt prefix stays stable.
 * **Measured:** the commit-time check, replayed over 4,269 commits with context files, fired once, on a real rename that left pydantic-ai's `CLAUDE.md` wrong for 37 commits. Rule capture showed no gain in our pilot runs (one run per arm) because Claude Code already kept every rule through one and three compactions; it is a safeguard for longer sessions, not a measured improvement.
 

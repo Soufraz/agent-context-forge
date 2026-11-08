@@ -20,7 +20,33 @@ if [ ! -t 0 ]; then
     fi
 
     # Only run on `git commit` commands
-    if ! printf '%s' "$COMMAND" | grep -qE '(^|[;&|]\s*)git\s+commit\b'; then
+    if ! printf '%s' "$COMMAND" | grep -qE '(^|[;&|]\s*)git\s+(-C\s+\S+\s+)?commit\b'; then
+      exit 0
+    fi
+
+    # Only audit commits to this project: `cd elsewhere && git commit` and `git -C elsewhere
+    # commit` commit to another repository. Relative paths start from the shell's cwd.
+    SHELL_CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty' 2>/dev/null || true)"
+    COMMIT_DIR="$(python3 - "$COMMAND" <<'PY' 2>/dev/null || true
+import re, shlex, sys
+target = ""
+for segment in re.split(r"&&|\|\||;|\n", sys.argv[1]):
+    try:
+        words = shlex.split(segment)
+    except ValueError:
+        continue
+    if words[:1] == ["cd"] and len(words) > 1:
+        target = words[1]
+    if words[:1] == ["git"] and "commit" in words:
+        if len(words) > 2 and words[1] == "-C":
+            target = words[2]
+        break
+print(target)
+PY
+)"
+    COMMIT_TOP="$(cd "${SHELL_CWD:-${CLAUDE_PROJECT_DIR:-.}}" 2>/dev/null && cd "${COMMIT_DIR:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || true)"
+    PROJECT_TOP="$(cd "${CLAUDE_PROJECT_DIR:-.}" && git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ -n "$COMMIT_TOP" ] && [ -n "$PROJECT_TOP" ] && [ "$COMMIT_TOP" != "$PROJECT_TOP" ]; then
       exit 0
     fi
   fi

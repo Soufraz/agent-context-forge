@@ -60,12 +60,20 @@ printf '%s' "$COMMIT_PAYLOAD" | PATH="$GATE_BIN:$PATH" CLAUDE_PROJECT_DIR="$GATE
 assert_ok "Commit without context changes skips the model call" test ! -e "$GATE_BIN/called"
 
 printf -- '- New rule\n' >> "$GATE_REPO/CLAUDE.md"
+# A commit in another repository is not this project's commit, even with CLAUDE.md dirty here
+OTHER_REPO="$(mktemp -d)"
+git -C "$OTHER_REPO" init -q
+for other_commit in "cd $OTHER_REPO && git add -A && git commit -m x" "git -C $OTHER_REPO commit -m x"; do
+  jq -nc --arg c "$other_commit" --arg cwd "$GATE_REPO" '{tool_name: "Bash", cwd: $cwd, tool_input: {command: $c}}' |
+    PATH="$GATE_BIN:$PATH" CLAUDE_PROJECT_DIR="$GATE_REPO" "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" >/dev/null
+done
+assert_ok "Commit in another repository skips the model call" test ! -e "$GATE_BIN/called"
 printf '%s' "$COMMIT_PAYLOAD" | PATH="$GATE_BIN:$PATH" CLAUDE_PROJECT_DIR="$GATE_REPO" "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh" >/dev/null
 assert_ok "Commit with unstaged CLAUDE.md change runs the model audit" test -e "$GATE_BIN/called"
-rm -rf "$GATE_REPO" "$GATE_BIN"
+rm -rf "$GATE_REPO" "$GATE_BIN" "$OTHER_REPO"
 
 # 4. Validate RTK Command Rewriter (Pillar 3)
-echo "[4/6] Checking rewrite-rtk.sh command compression hook..."
+echo "[4/7] Checking rewrite-rtk.sh command compression hook..."
 MOCK_BIN="$(mktemp -d)"
 # Emulates `rtk hook claude`: prefixes the command with rtk
 cat > "$MOCK_BIN/rtk" <<'EOF'

@@ -73,7 +73,7 @@ export function auditPillar4(projectDir) {
     findings.push({
       status: 'pass',
       title: 'Subagent Exploration Guardrail Active',
-      description: 'PreToolUse hook blocks runaway inline searches (10+ Read/Grep calls) and enforces subagent delegation.'
+      description: 'PreToolUse hook adds a note suggesting a subagent after 15 consecutive inline searches; it never blocks a call.'
     });
   } else if (guardrail.wired) {
     findings.push({

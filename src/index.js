@@ -284,7 +284,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'guardrail',
         label: 'Exploration Guardrail Hook (Default, recommended)',
-        hint: '10-call threshold blocks runaway inline search noise'
+        hint: 'Non-blocking note after 15 consecutive searches'
       },
       {
         value: 'orchestrator',

@@ -43,7 +43,7 @@ npm test
 
 This runs:
 - `node --test tests/cli.test.js`: Validates directory detection, Tier-1 rule generation, scaffolding, and 5-Pillar HTML scoring.
-- `./tests/run-tests.sh`: Executes end-to-end integration tests for all 5 Pillars (prefix-stability gate, RTK command rewriting, 10-call exploration counter, episodic memory checks, and `.claude/settings.json` validation).
+- `./tests/run-tests.sh`: Executes end-to-end integration tests for all 5 Pillars (prefix-stability gate, RTK command rewriting, 15-search exploration note, episodic memory checks, and `.claude/settings.json` validation).
 
 Make sure all 17+ tests pass before submitting your PR!
 

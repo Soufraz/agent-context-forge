@@ -1,7 +1,7 @@
 {
   "name": "agent-context-forge",
   "version": "0.2.1",
-  "description": "Interactive CLI scaffold and 5-pillar context quality auditor for AI coding agents",
+  "description": "A starting foundation for agent-written projects: context files, settings and hooks that stay true as the repo changes, plus a CLI to pick a tool for each context-engineering pillar",
   "type": "module",
   "bin": {
     "agent-context-forge": "bin/cli.js",
@@ -28,7 +28,10 @@
     "agent",
     "context-engineering",
     "claude-code",
-    "prompt-caching",
+    "claude-md",
+    "agents-md",
+    "hooks",
+    "scaffold",
     "lsp",
     "rtk",
     "subagents",

@@ -11,12 +11,14 @@ import { offerToolInstallations } from './installer-helper.js';
 import { autoCompactStatus, describeAutoCompact, enableAutoCompactLocally } from './compaction.js';
 import { execSync } from 'node:child_process';
 
+const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
+
 export async function runCli() {
   console.clear();
 
   p.intro(
     `${pc.bgCyan(pc.black(' 🛠️  AGENT CONTEXT FORGE '))} ${pc.dim(
-      'v0.1.0 — Context Engineering Harness'
+      `v${VERSION} — A starting foundation for agent projects`
     )}`
   );
 
@@ -27,8 +29,8 @@ export async function runCli() {
     pc.cyan('│ ') + pc.gray('↳ How you brainstorm, decompose features, and coordinate tasks.       ') + pc.cyan('│'),
     pc.cyan('├────────────────────────────────────────────────────────────────────────┤'),
     pc.cyan('│ ') + pc.green('▲ ▲ ▲ ▲ ▲  ') + pc.bold(pc.green('LAYER 1: The Foundation Harness (agent-context-forge)')) + pc.cyan('       │'),
-    pc.cyan('│ ') + pc.white('The rails: Prefix Cache Stability • LSP Navigation • RTK Masking        ') + pc.cyan('│'),
-    pc.cyan('│ ') + pc.gray('↳ Keeps active context lean, prevents token bloat, freezes the prefix.  ') + pc.cyan('│'),
+    pc.cyan('│ ') + pc.white('Context files, settings & hooks • your pick of tools for each pillar   ') + pc.cyan('│'),
+    pc.cyan('│ ') + pc.gray('↳ Keeps your context true and alive as the repo and sessions grow.     ') + pc.cyan('│'),
     pc.cyan('└────────────────────────────────────────────────────────────────────────┘')
   ].join('\n');
 
@@ -38,11 +40,11 @@ export async function runCli() {
     )} | ${pc.cyan('Repository & Memory = Disk')} ${pc.white('(queried on demand)')}\n\n` +
       `${asciiChart}\n\n` +
       `${pc.bold('🏛️  The 5 Pillars of Context Engineering:')}\n` +
-      `  ${pc.yellow('1. Prefix Stability')}       → Keep Tier-1 root rules small and static (<150 lines); they ride along on every turn.\n` +
-      `  ${pc.yellow('2. Progressive Disclosure')} → Query compiler symbols (LSP) instead of reading 400-line files.\n` +
-      `  ${pc.yellow('3. Observation Masking')}    → Compress test/build noise with RTK.\n` +
-      `  ${pc.yellow('4. Context Isolation')}      → Delegate sprawling searches to subagents; keep chat flat.\n` +
-      `  ${pc.yellow('5. Episodic Memory')}        → Retain cross-session lessons in Auto-Memory outside repo files.`,
+      `  ${pc.yellow('1. Prefix Stability')}       → Keep root rules (CLAUDE.md/AGENTS.md) short, static and true; they load every turn.\n` +
+      `  ${pc.yellow('2. Progressive Disclosure')} → Look things up on demand: text search (default) or LSP (opt-in).\n` +
+      `  ${pc.yellow('3. Observation Masking')}    → Filter test/build output: rtk (default) or your own filter.\n` +
+      `  ${pc.yellow('4. Context Isolation')}      → Send sprawling searches to subagents: guardrail and/or orchestrator.\n` +
+      `  ${pc.yellow('5. Episodic Memory')}        → Keep lessons across sessions: Auto-Memory (default) or context-mode.`,
     '📖 Welcome & Core Concepts'
   );
 

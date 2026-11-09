@@ -246,7 +246,7 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
-  test('scaffoldProject: the LSP references rule is opt-in, since it measured +49-51% cost', () => {
+  test('scaffoldProject: the LSP references rule is opt-in, since its cost is unproven', () => {
     const lspRule = /`LSP` tool's references lookup/;
     const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_nolsp_'));
     scaffoldProject(plain);

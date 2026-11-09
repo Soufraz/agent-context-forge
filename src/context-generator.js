@@ -40,8 +40,10 @@ export function buildSddSection(sdd) {
 
 // Opt-in: LSP references are more precise than text search when names collide or imports are
 // aliased, and models rarely pick LSP on their own. With this rule Sonnet found every caller in
-// 2 of 6 runs (0 of 6 without), but the runs cost 49-51% more (benchmarks round 4), so the
-// starter leaves it out unless the user chooses LSP navigation.
+// 2 of 6 runs (0 of 6 without), but the runs cost 49-51% more in benchmarks round 4. That figure
+// is inflated by the fresh-folder cache artifact (see benchmarks/README.md), and the rule's cost
+// in a fixed folder was never measured, so the starter leaves it out unless the user chooses
+// LSP navigation.
 const LSP_REFERENCES_RULE =
   "- To find who calls a function or where a symbol is used, prefer the `LSP` tool's references lookup when it is available (load it with ToolSearch if it isn't listed): text search conflates same-named symbols and misses aliased imports.";
 const LOCKFILE_RULE = '- Search lockfiles with `grep -n` instead of reading them whole.';

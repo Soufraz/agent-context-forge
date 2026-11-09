@@ -263,7 +263,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
       {
         value: 'native',
         label: 'Claude Native LSP (opt-in)',
-        hint: 'Exact callers on large typed codebases; measured +49-51% cost on that task'
+        hint: 'Precise symbol lookup (references); one benchmark task, cost impact unclear'
       },
       {
         value: 'custom',

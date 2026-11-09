@@ -9,7 +9,7 @@
 
 [![Context Engineering](https://img.shields.io/badge/Architecture-5%20Pillars-success)](#2-pick-your-tools-pillar-by-pillar)
 [![Engine Support](https://img.shields.io/badge/Engine-Claude%20Code%20%7C%20Universal%20Git-blue)](#portability--roadmap)
-[![Zero Telemetry](https://img.shields.io/badge/Privacy-Zero%20Telemetry-brightgreen)](#license)
+[![Zero Telemetry](https://img.shields.io/badge/Privacy-Zero%20Telemetry-brightgreen)](#see-what-your-sessions-carry)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -29,7 +29,7 @@ npx agent-context-forge
   <img src="assets/demo.gif" alt="Agent Context Forge Interactive CLI Scaffolding Demo" width="900">
 </p>
 
-* **Empty folder, or Install mode:** a wizard asks one question per pillar and layer, then writes the setup.
+* **Empty folder, or Install mode:** a wizard asks one question for each of pillars 2–5 and one for the planning layer, then writes the setup.
 * **Existing repository:** scores the current setup against the five pillars and opens an HTML report, or installs the setup.
 
 ---
@@ -44,7 +44,7 @@ Two things:
 It does not dictate how you plan or build features. It is the **Layer 1** foundation under whatever **Layer 2** methodology you use:
 
 <p align="center">
-  <img src="assets/diagrams/two-layer-architecture.svg" alt="The 2-Layer Stack: Harness vs. Methodology" width="880">
+  <img src="assets/diagrams/two-layer-architecture.svg" alt="Layer 1: context foundation; Layer 2: planning methodology" width="880">
 </p>
 
 The guiding idea: the **context window is RAM** (finite, and attention thins as it fills), and the **repository, language servers and memory are disk** (queried on demand).
@@ -90,7 +90,7 @@ Models follow instructions well, and Claude Code keeps them well: in our pilots,
 
 ## 2. Pick Your Tools, Pillar by Pillar
 
-The wizard asks one question per pillar and one for the planning layer. Each choice has a default, so pressing Enter all the way gives a working setup.
+The wizard asks one question for each of pillars 2–5 (Pillar 1 is always installed) and one for the planning layer. Each choice has a default, so pressing Enter all the way gives a working setup.
 
 ### Pillar 1: Prefix stability
 
@@ -155,7 +155,7 @@ In an existing repository, choose **Scan**. It scores the setup against the five
   <img src="assets/report-mocks/suggestion1-executive-dashboard.svg" alt="Context Health Audit Dashboard Simulation" width="880">
 </p>
 
-* **Score (0–100, grade A–F):** a setup checklist for the five pillars as this tool defines them, not a benchmark. A hook counts only when it is wired in settings and its script exists; equivalents count (rtk's own `rtk init -g` hook, any `PreCompact` or `SessionStart` `compact` hook). Two checks (16 points) look for this harness's own commit gate and exploration guardrail.
+* **Score (0–100, grade A–F):** a setup checklist for the five pillars as this tool defines them, not a benchmark. A hook counts only when it is wired in settings and its script exists; equivalents count (rtk's own `rtk init -g` hook, any `PreCompact` or `SessionStart` `compact` hook). Two checks (16 points) look for this project's own commit gate and exploration guardrail. 12 of Pillar 2's 20 points need a code intelligence plugin, which the default leaves off, so a default install scores below 100.
 * **Measurements:** the size of the always-loaded instruction file (lines, approximate tokens), how large a whole-file read of an unprotected lockfile would be, and whether auto-compaction is on.
 * **`file:line` findings:** volatile markers (`TODO`, checkboxes, dates) and dead paths in `CLAUDE.md` / `AGENTS.md`.
 * **Fixes:** offers to install missing tools (`rtk`, `typescript-language-server`, `pyright`) and prints the code intelligence plugin for your language.
@@ -181,9 +181,11 @@ On cost, the check is for no harm, not for savings:
 
 In the latest round (the default setup against plain Claude Code, five task types on Sonnet and Haiku, 6 pairs each, one folder per arm as in a real project), cost was:
 
-* **Lower on 3 of 8:** fixing failing tests (−27% Sonnet, −49% Haiku) and a six-prompt session on Sonnet (−9%).
-* **No clear difference on 3:** a lockfile question, explaining a request path, and finding callers on Haiku.
+Cost was within noise or lower on 6 of the 8 task and model pairs, and higher on 2:
+
 * **Higher on 2:** finding callers on Sonnet (+11%, 90% interval +1 to +21%) and the six-prompt session on Haiku (+23%, +5 to +42%).
+* **No clear difference on 3:** a lockfile question, explaining a request path, and finding callers on Haiku.
+* **Lower on 3:** fixing failing tests (−27% on Sonnet; −49% on Haiku, a noisy figure because three plain runs kept working in the background) and a six-prompt session on Sonnet (−9%).
 
 So it is not free everywhere. On Sonnet test fixing, the project facts cut attempts to run the tests without `uv` from 9 to 1 across the six runs; the two higher arms are not explained yet.
 

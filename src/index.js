@@ -138,7 +138,7 @@ export async function runCli() {
       },
       {
         value: 'install',
-        label: `${pc.green('🚀 Install / Upgrade Context Forge Harness')}`,
+        label: `${pc.green('🚀 Install / Upgrade the Context Forge setup')}`,
         hint: 'Injects hooks, doctor scripts & rules into this repo'
       },
       {
@@ -286,11 +286,11 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
 
   // Pillar 3: Observation Masking
   const maskingChoice = await p.select({
-    message: '[Pillar 3] Observation Masking (Output Compression):',
+    message: '[Pillar 3] Observation Masking (Output Filtering):',
     options: [
       {
         value: 'rtk',
-        label: 'RTK — Rust Token Killer (Default, recommended)',
+        label: 'rtk (Default)',
         hint: 'Collapses passing tests, keeps failure diffs'
       },
       {

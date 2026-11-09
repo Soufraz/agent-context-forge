@@ -50,7 +50,7 @@
     <rect x="560" y="0" width="260" height="90" rx="8" fill="url(#cardBg)" stroke="#1e293b" stroke-width="1" />
     <text x="578" y="24" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="700" fill="#94a3b8">UNPROTECTED LOCKFILE EXPOSURE</text>
     <text x="578" y="62" font-family="-apple-system, system-ui, sans-serif" font-size="30" font-weight="800" fill="#10b981">None</text>
-    <text x="578" y="80" font-family="-apple-system, system-ui, sans-serif" font-size="10" fill="#64748b">Lockfiles guarded by permissions.deny</text>
+    <text x="578" y="80" font-family="-apple-system, system-ui, sans-serif" font-size="10" fill="#64748b">Whole-file reads of lockfiles blocked</text>
   </g>
 
   <!-- 5 Pillar Rows -->
@@ -66,16 +66,16 @@
     <!-- Row 2 -->
     <rect x="0" y="52" width="820" height="46" rx="6" fill="#090d16" stroke="#1f2937" stroke-width="1" />
     <rect x="0" y="52" width="4" height="46" rx="2" fill="#10b981" />
-    <text x="18" y="74" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 2: Progressive Disclosure via Native LSP</text>
-    <text x="18" y="90" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">typescript-lsp plugin + server ready • permissions.deny blocks lockfiles &amp; build artifacts</text>
+    <text x="18" y="74" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 2: Progressive Disclosure (LSP opted in)</text>
+    <text x="18" y="90" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">typescript-lsp plugin + server ready • whole-file read guard on lockfiles &amp; bundles</text>
     <rect x="730" y="63" width="76" height="24" rx="4" fill="#064e3b" />
     <text x="768" y="79" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#34d399" text-anchor="middle">20/20 pts</text>
 
     <!-- Row 3 -->
     <rect x="0" y="104" width="820" height="46" rx="6" fill="#090d16" stroke="#1f2937" stroke-width="1" />
     <rect x="0" y="104" width="4" height="46" rx="2" fill="#10b981" />
-    <text x="18" y="126" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 3: Smart Observation Masking (RTK)</text>
-    <text x="18" y="142" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">Transparent PreToolUse command rewriter active • Collapses passing test stdout</text>
+    <text x="18" y="126" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 3: Observation Masking (rtk)</text>
+    <text x="18" y="142" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">PreToolUse rewrite hook active • Collapses passing test output</text>
     <rect x="730" y="115" width="76" height="24" rx="4" fill="#064e3b" />
     <text x="768" y="131" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#34d399" text-anchor="middle">15/15 pts</text>
 
@@ -83,7 +83,7 @@
     <rect x="0" y="156" width="820" height="46" rx="6" fill="#090d16" stroke="#1f2937" stroke-width="1" />
     <rect x="0" y="156" width="4" height="46" rx="2" fill="#10b981" />
     <text x="18" y="178" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 4: Subagent Context Isolation</text>
-    <text x="18" y="194" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">10-call exploration threshold armed • Prevents runaway inline search dilution</text>
+    <text x="18" y="194" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">Exploration note every 15 searches • Suggests a subagent, never blocks</text>
     <rect x="730" y="167" width="76" height="24" rx="4" fill="#064e3b" />
     <text x="768" y="183" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#34d399" text-anchor="middle">20/20 pts</text>
 
@@ -91,7 +91,7 @@
     <rect x="0" y="208" width="820" height="46" rx="6" fill="#090d16" stroke="#1f2937" stroke-width="1" />
     <rect x="0" y="208" width="4" height="46" rx="2" fill="#10b981" />
     <text x="18" y="230" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Pillar 5: Episodic Auto-Memory &amp; PreCompact</text>
-    <text x="18" y="246" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">Auto-Memory verified (3 topics) • PreCompact handover hook prevents lossy amnesia</text>
+    <text x="18" y="246" font-family="-apple-system, system-ui, sans-serif" font-size="11" fill="#94a3b8">Auto-Memory verified (3 topics) • PreCompact handover • Auto-compaction on</text>
     <rect x="730" y="219" width="76" height="24" rx="4" fill="#064e3b" />
     <text x="768" y="235" font-family="-apple-system, system-ui, sans-serif" font-size="11" font-weight="800" fill="#34d399" text-anchor="middle">15/15 pts</text>
   </g>

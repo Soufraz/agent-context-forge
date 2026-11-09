@@ -3,11 +3,11 @@
 What we check before asking anyone to adopt the default setup: that it is no worse than plain
 Claude Code, in correctness and in cost, and what the context-stability hooks actually do. The
 goal is a no-harm check, not proof of savings. The method is paired runs of Claude Code on real
-open-source repositories, with and without the harness, graded against ground truth that no
+open-source repositories, with and without the default setup, graded against ground truth that no
 model produced. Each table below links to its per-run data; the [main README](../README.md)
 summarizes the result.
 
-> **Status.** Round 4 (the 0.2.1 harness) is the current result. Round 2 (the v2 harness) is
+> **Status.** Round 6 (the current default, below) is the current result; round 4 shows what the LSP rule cost. Round 2 (the v2 harness) is
 > kept for the record, but a benchmark bug inflated its savings on the click tasks; see
 > [Round 2 and the benchmark bug](#round-2-and-the-benchmark-bug). The context-stability results
 > are pilots with one run per arm. The runner scripts are not published yet; see

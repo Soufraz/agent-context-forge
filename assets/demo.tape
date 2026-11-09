@@ -27,7 +27,7 @@ Enter
 Sleep 1.4s
 Enter
 
-# 3. Pillar 2: Progressive Disclosure (Native LSP default)
+# 3. Pillar 2: Progressive Disclosure (Text search default; LSP is opt-in)
 Sleep 1.2s
 Enter
 
@@ -53,6 +53,11 @@ Enter
 
 # Wait for scaffolding & doctor output to complete
 Sleep 2.8s
+
+# 9. Auto-compaction prompt (Yes default; shown only when compaction is off on the recording machine)
+Sleep 1.2s
+Enter
+Sleep 1.5s
 
 # List created files using tree
 Type "tree -a -I '.git'"

@@ -9,8 +9,15 @@ Set Theme "TokyoNight"
 Set WindowBar Colorful
 Set TypingSpeed 45ms
 
+# The recording runs under a throwaway HOME so no real username or path shows in the GIF. The
+# seeded settings keep auto-compaction off, which is what triggers its prompt at the end. npm
+# keeps the real cache so npx doesn't download the package inside the recording.
 Hide
-Type "rm -rf ~/demo-app && mkdir -p ~/demo-app && cd ~/demo-app && export npm_config_yes=true PS1='demo-app ❯ ' && clear"
+Type "npm_config_cache=$HOME/.npm; export npm_config_cache npm_config_yes=true"
+Enter
+Type "export HOME=/Users/Shared/demo PS1='demo-app ❯ ' && rm -rf $HOME && mkdir -p $HOME/.claude $HOME/demo-app && cd $HOME/demo-app"
+Enter
+Type `echo '{"autoCompactEnabled": false}' > $HOME/.claude/settings.json && clear`
 Enter
 Sleep 300ms
 Show

@@ -175,11 +175,17 @@ A visibility tool. It reads the session transcripts Claude Code keeps in `~/.cla
 
 ## Is It Safe to Adopt?
 
-We check that the default setup doesn't make Claude Code worse than a plain setup. In paired runs on real open-source repos, graded against ground truth worked out without a model, the harness was as correct as plain Claude Code on every measured task. On one task, the opt-in LSP rule gave the only exact answers.
+We check that the default setup doesn't make Claude Code worse than a plain setup. In paired runs on real open-source repos, graded against ground truth worked out without a model, the default setup was as correct as plain Claude Code on every measured task but one: on the hardest (find every caller of a function), neither usually succeeds (1 exact answer in 6 for plain Claude Code, 0 for the default). The opt-in LSP rule gave the only reliable exact answers there.
 
 On cost, the check is for no harm, not for savings:
 
-<!-- NO-HARM-RESULT -->
+In the latest round (the default setup against plain Claude Code, five task types on Sonnet and Haiku, 6 pairs each, one folder per arm as in a real project), cost was:
+
+* **Lower on 3 of 8:** fixing failing tests (−27% Sonnet, −49% Haiku) and a six-prompt session on Sonnet (−9%).
+* **No clear difference on 3:** a lockfile question, explaining a request path, and finding callers on Haiku.
+* **Higher on 2:** finding callers on Sonnet (+11%, 90% interval +1 to +21%) and the six-prompt session on Haiku (+23%, +5 to +42%).
+
+So it is not free everywhere. On Sonnet test fixing, the project facts cut attempts to run the tests without `uv` from 9 to 1 across the six runs; the two higher arms are not explained yet.
 
 An earlier round reported savings that a benchmark bug had inflated; it is kept for the record. Method, tasks, confidence intervals and every run: **[benchmarks/README.md](benchmarks/README.md)**.
 

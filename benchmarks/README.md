@@ -13,6 +13,34 @@ summarizes the result.
 > are pilots with one run per arm. The runner scripts are not published yet; see
 > [What is not here yet](#what-is-not-here-yet).
 
+## No-harm check (round 6: the new default, 6 paired runs per arm, fixed folders)
+
+The default setup as the installer now writes it (LSP off), against plain Claude Code, on every
+task type, one folder per arm as in a real project. Rep 0 warmed each arm's cache and is left
+out. Every run finished all its prompts; no foreign `__pycache__`, no shared-clone changes.
+
+| Task | Model | Correct (plain / default) | Cost change (90% CI) | Default cheaper in |
+|---|---|---|---|---|
+| Fix failing tests (click) | Sonnet | 6/6 / 6/6 | **−27%** (−31 to −23) | 6/6 |
+| Fix failing tests (click) | Haiku | 6/6 / 6/6 | **−49%** (−63 to −36) | 6/6 |
+| Six-prompt session (click) | Sonnet | 6/6 / 6/6 | **−9%** (−16 to −2) | 5/6 |
+| Explain dispatch (gin) | Sonnet | 6/6 / 6/6 | −3% (−9 to +2) | 3/6 |
+| Lockfile question | Sonnet | 6/6 / 6/6 | +5% (−9 to +23) | 3/6 |
+| Find callers (date-fns) | Haiku | 0/6 / 0/6 | −5% (−18 to +9) | 4/6 |
+| Find callers (date-fns) | Sonnet | 1/6 / 0/6 exact | **+11%** (+1 to +21) | 2/6 |
+| Six-prompt session (click) | Haiku | 6/6 / 6/6 | **+23%** (+5 to +42) | 1/6 |
+
+- **Where it helps:** on Sonnet test fixing, the project facts cut attempts to run tests
+  without `uv` from 9 to 1 across the six runs. On Haiku, three baseline runs started
+  background tasks and kept working until the 30-minute alarm (exit 142, last result a
+  success); that real behaviour is part of the −49%, so treat that figure as noisy.
+- **Where it costs more:** on the Haiku session, the default arm read 33% more cached context
+  and wrote 20% more output (more requests, larger context; rtk rewrote ~15 commands per run).
+  On finding callers with Sonnet, the first prompt is ~760 tokens larger and rtk rewrote ~3
+  commands per run. Neither is attributed yet; an rtk-off ablation on those two arms would.
+- Data: `results-v6-noharm` (runner `bench/run-all-noharm.sh`, harness pinned to
+  `.acf-versions/v0.3-dev-eb00815`).
+
 ## Cost and correctness (round 4: 0.2.1 harness, 6 paired runs per arm)
 
 | Task | Model | Correct (base / harness) | Cost change (90% CI) | Tool output (90% CI) | Peak context | Harness cheaper in |

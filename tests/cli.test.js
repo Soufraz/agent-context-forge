@@ -11,6 +11,7 @@ import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 import { buildUsageReport, formatUsageReport, projectTranscriptDir } from '../src/usage-report.js';
+import { autoCompactStatus, describeAutoCompact, enableAutoCompactLocally } from '../src/compaction.js';
 import { auditPillar2 } from '../src/scanner/pillar2-disclosure.js';
 import { auditPillar5 } from '../src/scanner/pillar5-memory.js';
 import {
@@ -308,7 +309,8 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.equal(report.medianFirstPrompt, 50_000);
     assert.equal(report.peakContext, 250_000);
     assert.equal(report.compactions, 1);
-    assert.equal(report.settings.autoCompact, false);
+    assert.equal(report.compaction.enabled, false);
+    assert.equal(report.compaction.source, 'user');
     // re-sent 250k x 0.1 = 25k, written 50k x 2 = 100k, output 300 x 5 = 1.5k
     assert.ok(Math.abs(report.share.cacheWrite1h - 100_000 / 126_500) < 1e-9);
     const text = formatUsageReport(report);
@@ -316,6 +318,40 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.ok(text.includes('fixed prompt is ~50k'));
     assert.ok(formatUsageReport(buildUsageReport({ projectDir: '/nothing', home })).startsWith('No Claude Code sessions'));
     fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  test('auto-compaction: the most specific setting wins, and the installer turns it on locally', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_compact_home_'));
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_compact_'));
+    assert.deepEqual(autoCompactStatus(project, { home, env: {} }), { enabled: true, source: 'default', file: null });
+    fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify({ autoCompactEnabled: false }));
+    const off = autoCompactStatus(project, { home, env: {} });
+    assert.equal(off.enabled, false);
+    assert.match(describeAutoCompact(off), /~\/\.claude\/settings\.json/);
+
+    fs.writeFileSync(path.join(project, '.gitignore'), 'node_modules');
+    enableAutoCompactLocally(project);
+    enableAutoCompactLocally(project);
+    assert.deepEqual(autoCompactStatus(project, { home, env: {} }).enabled, true, 'project local beats user');
+    assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf-8'), 'node_modules\n.claude/settings.local.json\n');
+    assert.equal(autoCompactStatus(project, { home, env: { DISABLE_AUTO_COMPACT: '1' } }).source, 'env');
+
+    const doctor = execSync(`"${path.join(process.cwd(), 'scripts', 'agent-gates', 'check-memory.sh')}"`, {
+      cwd: project,
+      encoding: 'utf-8',
+      env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: project, DISABLE_AUTO_COMPACT: '' }
+    });
+    assert.match(doctor, /Auto-Compaction\]: on/);
+    fs.rmSync(path.join(project, '.claude', 'settings.local.json'));
+    const doctorOff = execSync(`"${path.join(process.cwd(), 'scripts', 'agent-gates', 'check-memory.sh')}"`, {
+      cwd: project,
+      encoding: 'utf-8',
+      env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: project, DISABLE_AUTO_COMPACT: '' }
+    });
+    assert.match(doctorOff, /⚠️ {2}\[Auto-Compaction\]: off/);
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(project, { recursive: true, force: true });
   });
 
   test('auditPillar1: dead path check flags missing files, not expressions or generated output', () => {

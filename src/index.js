@@ -8,6 +8,7 @@ import { auditProject } from './scanner/index.js';
 import { generateHtmlReport } from './reporter/html-template.js';
 import { openInBrowser } from './reporter/open-browser.js';
 import { offerToolInstallations } from './installer-helper.js';
+import { autoCompactStatus, describeAutoCompact, enableAutoCompactLocally } from './compaction.js';
 import { execSync } from 'node:child_process';
 
 export async function runCli() {
@@ -195,6 +196,10 @@ async function runScanAndReport(projectDir) {
       unprotectedLockfileTokens > 0 ? pc.red(`~${unprotectedLockfileTokens} tokens`) : pc.green('none')
     }`
   );
+  const compaction = autoCompactStatus(projectDir);
+  p.log.message(
+    `  ${pc.bold('Auto-Compaction:')} ${(compaction.enabled ? pc.green : pc.yellow)(describeAutoCompact(compaction))}`
+  );
   p.log.message(`  ${pc.bold('Report Path:')} ${pc.dim(reportPath)}\n`);
 
   p.log.step('Opening visual HTML dashboard in your default browser...');
@@ -213,6 +218,29 @@ async function runScanAndReport(projectDir) {
   }
 
   p.outro(pc.green('Context audit finished! Check your browser for details.'));
+}
+
+/**
+ * Explains why auto-compaction matters when it is off, and offers to turn it on for this
+ * project only (.claude/settings.local.json, kept out of git).
+ */
+async function offerAutoCompact(targetDir) {
+  const status = autoCompactStatus(targetDir);
+  if (status.enabled) return;
+  p.log.warn(
+    `Auto-compaction is ${describeAutoCompact(status)}.\n` +
+      'Without it, a session grows until the context window is full. Every request re-sends the whole\n' +
+      'conversation, and models answer less reliably as their input grows. Compaction summarizes the\n' +
+      "conversation instead; this harness's PreCompact handover and rule capture keep what matters."
+  );
+  if (status.source === 'env') return;
+  const enable = await p.confirm({
+    message: 'Turn auto-compaction on for this project only? (writes .claude/settings.local.json, kept out of git)',
+    initialValue: true
+  });
+  if (p.isCancel(enable) || !enable) return;
+  const file = enableAutoCompactLocally(targetDir);
+  p.log.success(`Auto-compaction on for this project (${path.relative(targetDir, file)}).`);
 }
 
 /**
@@ -439,6 +467,8 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
 
   // Interactively offer to install missing tools (rtk, and a language server when LSP was chosen)
   await offerToolInstallations(targetDir, { lsp: lsp === 'native' });
+
+  await offerAutoCompact(targetDir);
 
   p.note(
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +

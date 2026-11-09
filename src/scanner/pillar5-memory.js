@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { hookCommands, loadSettingsLayers, projectScriptStatus } from './settings.js';
+import { autoCompactStatus, describeAutoCompact } from '../compaction.js';
 
 /**
  * Audits Pillar 5: Episodic Memory & Lossy Compaction Protection
@@ -100,6 +101,25 @@ export function auditPillar5(projectDir) {
       description: 'When /compact triggers mid-session, lossy summarization may discard exact line numbers and hypotheses.'
     });
   }
+
+  // 3. Auto-compaction (no points: it is a per-person setting, not part of the repo's setup)
+  const compaction = autoCompactStatus(projectDir);
+  findings.push(
+    compaction.enabled
+      ? {
+          status: 'pass',
+          title: 'Auto-Compaction On',
+          description: `Auto-compaction is ${describeAutoCompact(compaction)}: long sessions are summarized before the context window fills.`
+        }
+      : {
+          status: 'warn',
+          title: 'Auto-Compaction Off',
+          description:
+            `Auto-compaction is ${describeAutoCompact(compaction)}. Sessions then grow until the context window is full: ` +
+            'every request re-sends the whole conversation, and models answer less reliably as input grows. ' +
+            'Turn it on for this project with "autoCompactEnabled": true in .claude/settings.local.json (the installer offers this).'
+        }
+  );
 
   return { score, maxScore, findings };
 }

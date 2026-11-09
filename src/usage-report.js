@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { autoCompactStatus, describeAutoCompact } from './compaction.js';
 
 // Relative prices at the standard Claude ratios (input = 1). Not dollars: those vary by model.
 export const WEIGHTS = { input: 1, cacheRead: 0.1, cacheWrite5m: 1.25, cacheWrite1h: 2, output: 5 };
@@ -108,29 +109,8 @@ export function buildUsageReport({ projectDir = process.cwd(), all = false, days
     peakContext: Math.max(0, ...sessions.map((s) => s.peakContext)),
     bigSessions: sessions.filter((s) => s.peakContext > BIG_CONTEXT).length,
     compactions: sessions.reduce((a, s) => a + s.compactions, 0),
-    settings: readCompactionSettings(home, projectDir)
+    compaction: autoCompactStatus(projectDir, { home })
   };
-}
-
-/** Whether auto-compaction is off, from the settings files and the environment. */
-export function readCompactionSettings(home, projectDir) {
-  const files = [
-    path.join(home, '.claude', 'settings.json'),
-    path.join(projectDir, '.claude', 'settings.json'),
-    path.join(projectDir, '.claude', 'settings.local.json')
-  ];
-  let autoCompact = true;
-  let window = null;
-  for (const file of files) {
-    try {
-      const settings = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      if (typeof settings.autoCompactEnabled === 'boolean') autoCompact = settings.autoCompactEnabled;
-      if (settings.autoCompactWindow !== undefined) window = settings.autoCompactWindow;
-      if (settings.env?.DISABLE_AUTO_COMPACT === '1') autoCompact = false;
-    } catch {}
-  }
-  if (process.env.DISABLE_AUTO_COMPACT === '1') autoCompact = false;
-  return { autoCompact, window };
 }
 
 const k = (n) => `${Math.round(n / 1000)}k`;
@@ -168,8 +148,8 @@ export function formatUsageReport(report, { scope = 'this project' } = {}) {
       `Re-sent context is the largest cost. It grows with context size x requests: /clear between tasks (save a note first) and /compact within a long one.`
     );
   }
-  if (!report.settings.autoCompact) {
-    tips.push('Auto-compaction is off (autoCompactEnabled: false or DISABLE_AUTO_COMPACT), so sessions grow until you compact by hand.');
+  if (!report.compaction.enabled) {
+    tips.push(`Auto-compaction is ${describeAutoCompact(report.compaction)}, so sessions grow until you compact by hand.`);
   }
   if (report.medianFirstPrompt > 40_000) {
     tips.push(

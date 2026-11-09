@@ -181,6 +181,7 @@ A common question with agent hooks is: *"Do these hooks slow down every tool cal
 ### Pillar 5: Episodic Memory & Lossy Compaction Handover
 * **Files:** [`.claude/hooks/pre-compact-handover.sh`](.claude/hooks/pre-compact-handover.sh) + [`scripts/agent-gates/check-memory.sh`](scripts/agent-gates/check-memory.sh)
 * **Mechanism:** Verifies Claude Code's native two-tier Auto-Memory (`~/.claude/projects/<slug>/memory/MEMORY.md`) on `SessionStart`, and triggers on `PreCompact` to print `git status -s` + `git diff --stat` and preservation rules. Claude Code uses a PreCompact hook's stdout as instructions for the compaction summary.
+* **Auto-compaction check:** the scan, the HTML report and the session-start doctor say whether Claude Code will compact long sessions on its own, and which settings file decided it. With it off, a session grows until the context window is full: every request re-sends the whole conversation, and models answer less reliably as input grows. When it is off, the installer explains this and offers to turn it on for that project only (`"autoCompactEnabled": true` in `.claude/settings.local.json`, which overrides the user setting and stays out of git). `DISABLE_AUTO_COMPACT=1` can't be overridden by any setting, so the tool only reports it.
 
 ### Context Stability: Rules That Outlive Compaction, Rule Gates, and Drift Notes
 * **Files:** [`.claude/hooks/context-stability.py`](.claude/hooks/context-stability.py) + `.claude/enforced-rules.json`

@@ -8,6 +8,25 @@ set -euo pipefail
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$PROJECT_ROOT"
 
+# 0. Auto-compaction: the most specific settings file that sets autoCompactEnabled wins
+#    (project local, then project, then user); DISABLE_AUTO_COMPACT overrides them all.
+#    Without it a session grows until the window is full: every request re-sends all of it,
+#    and models answer less reliably as input grows.
+COMPACT=""
+for f in .claude/settings.local.json .claude/settings.json "${HOME:-~}/.claude/settings.json"; do
+  [ -f "$f" ] || continue
+  COMPACT="$(jq -r 'if has("autoCompactEnabled") then (.autoCompactEnabled|tostring) else empty end' "$f" 2>/dev/null || true)"
+  if [ -n "$COMPACT" ]; then COMPACT_FILE="$f"; break; fi
+done
+if [ "${DISABLE_AUTO_COMPACT:-}" = "1" ] || [ "${DISABLE_AUTO_COMPACT:-}" = "true" ]; then
+  printf '⚠️  [Auto-Compaction]: off (DISABLE_AUTO_COMPACT is set). Long sessions grow until the window is full, re-sending everything on every request.\n'
+elif [ "$COMPACT" = "false" ]; then
+  printf '⚠️  [Auto-Compaction]: off (autoCompactEnabled: false in %s). Long sessions grow until the window is full, re-sending everything on every request.\n' "$COMPACT_FILE"
+  printf '   → Turn it on for this project only: "autoCompactEnabled": true in .claude/settings.local.json\n'
+else
+  printf '✓ [Auto-Compaction]: on.\n'
+fi
+
 # 1. Check if Auto-Memory is disabled via environment variable
 if [ "${CLAUDE_CODE_DISABLE_AUTO_MEMORY:-0}" = "1" ] || [ "${CLAUDE_CODE_DISABLE_AUTO_MEMORY:-0}" = "true" ]; then
   printf '⚠️  [Episodic Memory Notice]: Auto-Memory is disabled via `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`.\n'

@@ -1,6 +1,6 @@
 {
   "name": "agent-context-forge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A starting foundation for agent-written projects: context files, settings and hooks that stay true as the repo changes, plus a CLI to pick a tool for each context-engineering pillar",
   "type": "module",
   "bin": {

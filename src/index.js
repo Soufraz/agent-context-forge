@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { inspectDirectory } from './detector.js';
+import { inspectDirectory, gitRepoState } from './detector.js';
 import { scaffoldProject, isExistingInstall, installedContextDrift } from './scaffolder.js';
 import { auditProject } from './scanner/index.js';
 import { generateHtmlReport } from './reporter/html-template.js';
 import { openInBrowser } from './reporter/open-browser.js';
 import { offerToolInstallations } from './installer-helper.js';
 import { autoCompactStatus, describeAutoCompact, enableAutoCompactLocally } from './compaction.js';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
 const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
@@ -263,6 +263,49 @@ export function explainContextDrift() {
 }
 
 /**
+ * Tells the user why a folder without a git repository loses most of the setup.
+ */
+export function explainNoGit() {
+  return (
+    'This folder is not a git repository.\n' +
+    'Most of what acf installs runs at commit time (the commit gate, the drift check on commit, the optional\n' +
+    '.githooks hook) or reads changed files through git, so without a repository those protections do nothing.\n' +
+    '(The context drift check uses its own snapshot and still works.)\n' +
+    '`git init` only creates the repository; acf never makes a commit for you.'
+  );
+}
+
+/**
+ * Offers to run `git init` when the folder is not inside any git repository.
+ * Says nothing for a repository, a folder nested in one, or a machine without git.
+ */
+async function offerGitInit(targetDir) {
+  if (gitRepoState(targetDir) !== 'none') return;
+
+  p.log.warn(explainNoGit());
+  const init = await p.confirm({
+    message: 'Run `git init` here?',
+    initialValue: true
+  });
+  if (p.isCancel(init)) process.exit(0);
+
+  if (!init) {
+    p.log.info(
+      'Not run until this folder is a git repository: the commit gate, the drift check on commit, the .githooks hook and the Stop rules.'
+    );
+    return;
+  }
+
+  try {
+    execFileSync('git', ['init'], { cwd: targetDir, stdio: 'pipe' });
+    p.log.success('Initialized a git repository.');
+  } catch (err) {
+    const reason = String(err.stderr || err.message || 'unknown error').trim().split('\n')[0];
+    p.log.warn(`\`git init\` failed (${reason}). Carrying on without a repository.`);
+  }
+}
+
+/**
  * Runs the interactive stack customization wizard and scaffolds the harness.
  */
 async function runCustomizationWizardAndScaffold(targetDir, engine) {
@@ -455,6 +498,9 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
   if (p.isCancel(driftEnabled)) process.exit(0);
   const contextDrift = driftEnabled ? 'on' : 'off';
 
+  // Before scaffolding, so the settings and hooks land in a folder that is already a repository
+  await offerGitInit(targetDir);
+
   const spinner = p.spinner();
   spinner.start('Scaffolding Agent Context Forge harness into repository...');
 
@@ -499,11 +545,14 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
 
   await offerAutoCompact(targetDir);
 
+  const notARepo = gitRepoState(targetDir) === 'none';
+
   p.note(
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +
       `• Claude Hooks: .claude/settings.json\n` +
       `• Pre-flight Doctor: ./scripts/agent-gates/doctor.sh\n` +
       `• Context drift check: ${contextDrift === 'on' ? 'on (ACF_CONTEXT_DRIFT=off in the \`env\` block of .claude/settings.json turns it off)' : 'off (re-run this wizard to turn it on)'}\n` +
+      (notARepo ? `• Git: this folder is not a repository yet; the commit-time protections wait for \`git init\`\n` : '') +
       `• Optional Universal Git Hook: git config core.hooksPath .githooks`,
     'Next Steps'
   );

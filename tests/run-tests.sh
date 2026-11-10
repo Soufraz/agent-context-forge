@@ -38,6 +38,17 @@ DOCTOR_OUT="$("$REPO_ROOT/scripts/agent-gates/doctor.sh")"
 assert_ok "doctor.sh exits 0 and produces output" test -n "$DOCTOR_OUT"
 assert_ok "check-memory.sh reports Episodic Memory status" grep -q "Episodic Memory" <<<"$DOCTOR_OUT"
 
+# Most protections run at commit time or read changes through git: the doctor warns, never fails
+DOCTOR_GIT_DIR="$(mktemp -d)"
+DOCTOR_NOGIT_OUT="$(CLAUDE_PROJECT_DIR="$DOCTOR_GIT_DIR" GIT_CONFIG_GLOBAL=/dev/null "$REPO_ROOT/scripts/agent-gates/doctor.sh")"
+assert_ok "doctor.sh warns when the folder is not a git repository" grep -q "not a git repository" <<<"$DOCTOR_NOGIT_OUT"
+assert_ok "doctor.sh says what waits for git init" grep -q "git init" <<<"$DOCTOR_NOGIT_OUT"
+git -C "$DOCTOR_GIT_DIR" init -q
+DOCTOR_GIT_OUT="$(CLAUDE_PROJECT_DIR="$DOCTOR_GIT_DIR" GIT_CONFIG_GLOBAL=/dev/null "$REPO_ROOT/scripts/agent-gates/doctor.sh")"
+assert_ok "doctor.sh reports a git repository without a warning" grep -q "\[Git\]: inside a git repository" <<<"$DOCTOR_GIT_OUT"
+assert_ok "doctor.sh stays quiet about git inside a repository" bash -c '! grep -q "not a git repository" <<<"$1"' _ "$DOCTOR_GIT_OUT"
+rm -rf "$DOCTOR_GIT_DIR"
+
 # 3. Validate Prefix Stability Fast-Filter (Pillar 1)
 echo "[3/8] Checking pre-commit-prefix-stability.sh fast filter..."
 FAST_OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"git status"}}' | "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh")"

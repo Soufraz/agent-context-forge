@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
-import { inspectDirectory } from '../src/detector.js';
+import { inspectDirectory, gitRepoState } from '../src/detector.js';
 import { generateProjectContext } from '../src/context-generator.js';
 import { scaffoldProject, isExistingInstall, installedContextDrift, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
-import { explainContextDrift } from '../src/index.js';
+import { explainContextDrift, explainNoGit } from '../src/index.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 import { buildUsageReport, formatUsageReport, projectTranscriptDir } from '../src/usage-report.js';
@@ -35,6 +35,58 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     const selfResult = inspectDirectory(process.cwd());
     assert.equal(selfResult.isEmpty, false);
     assert.ok(selfResult.projectTypes.length > 0);
+  });
+
+  test('gitRepoState: tells a fresh folder, a repository, a subfolder of one and a machine without git apart', () => {
+    // Keep the host's git configuration out of the result
+    const saved = { cfg: process.env.GIT_CONFIG_GLOBAL, sys: process.env.GIT_CONFIG_NOSYSTEM, path: process.env.PATH };
+    process.env.GIT_CONFIG_GLOBAL = '/dev/null';
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+    const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_git_')));
+    const emptyBin = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_nogit_bin_'));
+    assert.throws(
+      () => execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: tmp, stdio: 'pipe' }),
+      /not a git repository/,
+      'precondition: no repository above the temp folder'
+    );
+
+    try {
+      assert.equal(gitRepoState(tmp), 'none');
+
+      execFileSync('git', ['init', '-q'], { cwd: tmp, stdio: 'pipe' });
+      assert.equal(gitRepoState(tmp), 'repo');
+      // A symlinked path to the same folder is still the repository root
+      const link = path.join(os.tmpdir(), `acf_test_git_link_${process.pid}`);
+      fs.symlinkSync(tmp, link);
+      try {
+        assert.equal(gitRepoState(link), 'repo');
+      } finally {
+        fs.unlinkSync(link);
+      }
+
+      const sub = path.join(tmp, 'packages', 'app');
+      fs.mkdirSync(sub, { recursive: true });
+      assert.equal(gitRepoState(sub), 'nested');
+
+      process.env.PATH = emptyBin;
+      assert.equal(gitRepoState(tmp), 'no-git');
+    } finally {
+      process.env.PATH = saved.path;
+      for (const [key, value] of [['GIT_CONFIG_GLOBAL', saved.cfg], ['GIT_CONFIG_NOSYSTEM', saved.sys]]) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(emptyBin, { recursive: true, force: true });
+    }
+  });
+
+  test('explainNoGit: short, names the consequence and that no commit is made', () => {
+    const text = explainNoGit();
+    assert.ok(text.split('\n').length <= 6);
+    assert.ok(text.includes('not a git repository'));
+    assert.ok(text.includes('git init'));
+    assert.ok(/never makes a commit/.test(text));
   });
 
   test('generateProjectContext: produces compact Tier-1 and Tier-2 rules adhering to Pillar 1', () => {

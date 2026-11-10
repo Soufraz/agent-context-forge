@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const IGNORED_FILES = new Set([
   '.git',
@@ -82,4 +83,40 @@ export function inspectDirectory(targetDir) {
     isContextForgeInstalled,
     filesFound
   };
+}
+
+/**
+ * Says whether a folder is a git repository.
+ *
+ * - 'repo': the folder is the root of a work tree
+ * - 'nested': the folder sits inside another repository (a monorepo subproject)
+ * - 'none': the folder is not inside any work tree
+ * - 'no-git': git is missing or could not answer, so nothing is offered
+ *
+ * @param {string} dir
+ * @returns {'repo' | 'nested' | 'none' | 'no-git'}
+ */
+export function gitRepoState(dir) {
+  let result;
+  try {
+    result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: dir,
+      stdio: 'pipe',
+      encoding: 'utf-8',
+      timeout: 5000,
+      env: { ...process.env, LC_ALL: 'C' }
+    });
+  } catch {
+    return 'no-git';
+  }
+  if (result.error) return 'no-git';
+  if (result.status !== 0) {
+    return /not a git repository/i.test(result.stderr || '') ? 'none' : 'no-git';
+  }
+  try {
+    const top = fs.realpathSync(result.stdout.trim());
+    return top === fs.realpathSync(dir) ? 'repo' : 'nested';
+  } catch {
+    return 'no-git';
+  }
 }

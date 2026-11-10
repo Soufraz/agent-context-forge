@@ -92,7 +92,7 @@ Models follow instructions well, and Claude Code keeps them well: in our pilots,
 
 ## 2. Pick Your Tools, Pillar by Pillar
 
-The wizard asks one question for each of pillars 2–5 (Pillar 1 is always installed) and one for the planning layer. Each choice has a default, so pressing Enter all the way gives a working setup.
+The wizard asks one question for each of pillars 2–5 (Pillar 1 is always installed) and one for the planning layer. Each choice has a default, so pressing Enter all the way gives a working setup. If the folder is not a git repository, the wizard also offers to run `git init` (default yes): the commit gate, the drift check on commit and `.githooks/pre-commit` run at commit time, and the Stop rules read changed files through git, so without a repository they do nothing. It only creates the repository and never makes a commit.
 
 ### Pillar 1: Prefix stability
 

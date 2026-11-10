@@ -19,14 +19,26 @@ One script, dispatched on the hook event:
   AskUserQuestion (update the files now, skip, or turn the check off for the project). The same
   findings are never asked twice, and the continuation (`stop_hook_active`) gets no output.
 
-ACF_CONTEXT_DRIFT=off turns the hook off entirely (the judge's own session runs with it set), and
-so does CLAUDE_CODE_SESSION_ATTENDED=0, which Claude Code sets for `claude -p` and the SDK: there
-is no human to ask.
+ACF_CONTEXT_DRIFT=off turns the hook off entirely (the judge's own session runs with it set), whether
+it is in the process environment or in the `env` block of the project's .claude/settings.local.json
+or .claude/settings.json (read here directly, local first as in Claude Code, so "turn this check off"
+holds from the next turn without relying on Claude Code re-reading settings mid-session). So does
+CLAUDE_CODE_SESSION_ATTENDED=0, which Claude Code sets for `claude -p` and the SDK: there is no
+human to ask.
 
 The judge sends the context files and the turn's diff to a model under the user's login. Secret
 files (.env*, *.pem, id_rsa*, *secret*, credentials*, ...) never enter the snapshot, the diff or
 the prompt. A tree over the file or byte cap is left alone. The judge gets 150 s
-(ACF_CONTEXT_DRIFT_TIMEOUT overrides) and a $0.05 budget; past either, the stop goes through.
+(ACF_CONTEXT_DRIFT_TIMEOUT can only shorten it) and a $0.05 budget; past either, the stop goes through.
+Each SessionStart removes other sessions' state dirs whose snapshot is over 3 days old.
+
+The judge runs with `--setting-sources project`: that is how it was measured and costed, and it keeps
+the user's global CLAUDE.md and settings out of its context. It therefore assumes the default Claude
+Code login (keychain or ANTHROPIC_API_KEY); a setup that authenticates through user-level settings
+(apiKeyHelper, a cloud provider's env block) may see the judge fail and the check do nothing.
+ACF_CONTEXT_DRIFT_DEBUG=<file> appends one line per judge failure or fail-open event to that file
+(time, session, reason, and for a non-zero exit the first 200 characters of the judge's stderr; never
+the prompt, file contents or environment values). Unset, nothing is written.
 
 `--judge-dirs BEFORE AFTER` runs the same diff and judge on two directories and prints
 {"ask": bool, "reasons": [str], "stale_files": [str]}, for scoring against a corpus.
@@ -62,7 +74,10 @@ MAX_FILES = 10_000  # over either cap the tree is left alone: no snapshot, no ju
 MAX_BYTES = 50 * 1024 * 1024
 MAX_FILE_BYTES = 1024 * 1024  # bigger files are skipped (lockfiles excepted: they are hashed only)
 DIFF_LIMIT = 40_000
-JUDGE_TIMEOUT = 150  # seconds; ACF_CONTEXT_DRIFT_TIMEOUT overrides
+JUDGE_TIMEOUT = 150  # seconds; ACF_CONTEXT_DRIFT_TIMEOUT can only shorten it
+PRUNE_AFTER = 3 * 24 * 3600  # seconds since another session's last snapshot before its dir is removed
+SETTINGS_FILES = (".claude/settings.local.json", ".claude/settings.json")  # Claude Code's precedence
+TRACE_STDERR = 200  # characters of the judge's stderr kept in a debug trace line
 JUDGE_BUDGET_USD = "0.05"
 JUDGE_MODEL = "haiku"
 ASKED = "asked"  # in the state dir: one findings hash per line, recorded when the user is asked
@@ -152,6 +167,63 @@ def state_dir(session_id: str) -> Path:
     return STATE_ROOT / f"drift_{safe_id}"
 
 
+SESSION = "-"  # the session id for trace lines, set once the hook input is read
+
+
+def trace(reason: str) -> None:
+    """Appends one line to $ACF_CONTEXT_DRIFT_DEBUG when it is set. Callers pass only fixed reasons,
+    exit codes and the judge's stderr: never the prompt, file contents or environment values."""
+    path = os.environ.get("ACF_CONTEXT_DRIFT_DEBUG")
+    if not path:
+        return
+    try:
+        line = " ".join(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} session={SESSION} {reason}".split())
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
+def judge_timeout() -> float:
+    """JUDGE_TIMEOUT, or ACF_CONTEXT_DRIFT_TIMEOUT when that is a shorter positive number of seconds."""
+    try:
+        value = float(os.environ.get("ACF_CONTEXT_DRIFT_TIMEOUT") or JUDGE_TIMEOUT)
+    except ValueError:
+        return JUDGE_TIMEOUT
+    return min(value, JUDGE_TIMEOUT) if value > 0 else JUDGE_TIMEOUT  # also rejects nan
+
+
+def off_in_settings(root: Path) -> bool:
+    """True when the project's settings set env.ACF_CONTEXT_DRIFT to "off". The first file that sets
+    the variable wins, as in Claude Code; an unreadable or malformed file never turns the check off."""
+    for name in SETTINGS_FILES:
+        try:
+            env = json.loads((root / name).read_text(encoding="utf-8")).get("env")
+            if isinstance(env, dict) and "ACF_CONTEXT_DRIFT" in env:
+                return env["ACF_CONTEXT_DRIFT"] == "off"
+        except Exception:
+            continue
+    return False
+
+
+def prune_states(current: Path) -> None:
+    """Removes other sessions' drift_* state dirs whose manifest is over PRUNE_AFTER old: each holds a
+    copy of a project's text files, and /tmp is often RAM. Symlinks are never followed or removed."""
+    try:
+        cutoff = time.time() - PRUNE_AFTER
+        for entry in os.scandir(STATE_ROOT):
+            try:
+                if (not entry.name.startswith("drift_") or entry.name == current.name
+                        or not entry.is_dir(follow_symlinks=False)):
+                    continue
+                if os.lstat(os.path.join(entry.path, MANIFEST)).st_mtime < cutoff:
+                    shutil.rmtree(entry.path, ignore_errors=True)
+            except OSError:
+                continue
+    except Exception:
+        pass
+
+
 def is_context(rel: str) -> bool:
     return os.path.basename(rel) in CONTEXT_NAMES or rel.startswith(CONTEXT_DIRS)
 
@@ -233,6 +305,7 @@ def take_snapshot(root: Path, state: Path) -> bool:
     snapshot = state / SNAPSHOT
     files = walk(root)
     if files is None:
+        trace(f"over file cap ({MAX_FILES} files or {MAX_BYTES // 2**20} MB): tree left alone, no judge")
         shutil.rmtree(snapshot, ignore_errors=True)
         (state / MANIFEST).unlink(missing_ok=True)
         return False
@@ -345,9 +418,14 @@ def render(context: dict[str, str], changes: list[Change]) -> tuple[str, str]:
 def judge(context: dict[str, str], changes: list[Change]) -> list[dict] | None:
     """Ask the model which context sentences the changes made false; None on any failure."""
     prompt, _ = render(context, changes)
-    timeout = float(os.environ.get("ACF_CONTEXT_DRIFT_TIMEOUT") or JUDGE_TIMEOUT)
+    timeout = judge_timeout()
+    limit = f"(limit {timeout:g} s)"
     cwd = STATE_ROOT / "drift-judge-cwd"  # empty: the judge discovers no CLAUDE.md from here
     cwd.mkdir(parents=True, exist_ok=True)
+    # --setting-sources project is how the judge was measured and costed, and it keeps the user's
+    # global CLAUDE.md and settings out of the judge's context. It assumes the default login: auth
+    # configured in user settings (apiKeyHelper, a provider's env block) is not loaded, so the judge
+    # may fail there; ACF_CONTEXT_DRIFT_DEBUG records why.
     cmd = ["claude", "-p", "--model", JUDGE_MODEL, "--no-session-persistence",
            "--settings", '{"hooks":{}}', "--setting-sources", "project", "--tools", "",
            "--system-prompt", PROMPT, "--max-budget-usd", JUDGE_BUDGET_USD,
@@ -357,15 +435,26 @@ def judge(context: dict[str, str], changes: list[Change]) -> list[dict] | None:
     for attempt in range(2):  # one retry for an empty or malformed reply; never after a timeout
         left = timeout - (time.monotonic() - start)
         if attempt and left < 10:
+            trace(f"judge: no time left for a retry {limit}")
             return None
         try:
             run = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
                                  errors="replace", timeout=left, cwd=cwd, env=env)
-        except (subprocess.TimeoutExpired, OSError):
+        except subprocess.TimeoutExpired:
+            trace(f"judge: timeout {limit}")
             return None
+        except FileNotFoundError:
+            trace("judge: claude not found on PATH")
+            return None
+        except OSError as e:
+            trace(f"judge: claude could not start ({type(e).__name__})")
+            return None
+        failed = f"non-zero exit {run.returncode} {limit}: {(run.stderr or '')[:TRACE_STDERR]}" \
+            if run.returncode else f"unparseable output {limit}"
         try:
             result = json.loads(run.stdout)
             if result.get("is_error"):
+                trace(f"judge: model error {str(result.get('subtype'))[:40]} (exit {run.returncode}) {limit}")
                 if "budget" in str(result.get("subtype")):
                     return None
                 continue
@@ -374,8 +463,10 @@ def judge(context: dict[str, str], changes: list[Change]) -> list[dict] | None:
                 verdict = json.loads(result.get("result") or "")
             findings = verdict["findings"]
             if not isinstance(findings, list):
+                trace(f"judge: unparseable output {limit}")
                 continue
         except Exception:
+            trace(f"judge: {failed}")
             continue
         return [{"file": str(f.get("file", "")), "context_quote": str(f.get("context_quote", "")),
                  "diff_evidence": str(f.get("diff_evidence", "")), "severity": str(f.get("severity", "")),
@@ -443,6 +534,7 @@ def session_start(data: dict) -> None:
     state = state_dir(data["session_id"])
     if not (state / MANIFEST).is_file():  # compaction and resume keep the turn's baseline
         take_snapshot(Path.cwd(), state)
+    prune_states(state)
 
 
 def stop_findings(data: dict) -> list[dict]:
@@ -495,7 +587,11 @@ def ask_reason(findings: list[dict]) -> str:
 
 def handle_stop(data: dict) -> dict | None:
     """The blocking decision that makes Claude ask the user, or None to let the stop through."""
-    if data.get("stop_hook_active"):  # the continuation after a question: stay silent, move the baseline
+    # The continuation after a question: stay silent, move the baseline. stop_hook_active is true on
+    # the continuation of ANY Stop hook's block, so when another hook blocks, this one refreshes the
+    # baseline without judging and that turn's changes are never checked. Accepted: judging there
+    # could ask a second question inside a continuation, and looping is worse than one missed turn.
+    if data.get("stop_hook_active"):
         take_snapshot(Path.cwd(), state_dir(data["session_id"]))
         return None
     findings = stop_findings(data)
@@ -530,10 +626,13 @@ HANDLERS = {
 
 
 def main() -> int:
+    global SESSION
     if sys.argv[1:2] == ["--judge-dirs"]:
+        SESSION = "judge-dirs"
         try:
             out = judge_dirs(sys.argv[2], sys.argv[3])
-        except Exception:
+        except Exception as e:
+            trace(f"hook error {type(e).__name__}: allowed")
             out = {"ask": False, "reasons": [], "stale_files": []}
         print(json.dumps(out))
         return 0
@@ -542,13 +641,16 @@ def main() -> int:
     try:
         data = json.load(sys.stdin)
         os.chdir(os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or ".")
+        if off_in_settings(Path.cwd()):  # same as the environment check: no walk, no judge, no output
+            return 0
         data.setdefault("session_id", "default")
+        SESSION = state_dir(data["session_id"]).name[len("drift_"):]
         handler = HANDLERS.get(data.get("hook_event_name", ""))
         result = handler(data) if handler else None
         if result:
             print(json.dumps(result))
-    except Exception:
-        pass
+    except Exception as e:
+        trace(f"hook error {type(e).__name__}: allowed")
     return 0
 
 

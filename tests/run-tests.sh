@@ -338,13 +338,15 @@ CD_SID="test_drift_$$"
 unset ACF_CONTEXT_DRIFT CLAUDE_CODE_SESSION_ATTENDED  # the tests set them per case
 CD_STATE="/tmp/agent_context_forge/drift_${CD_SID}"
 # The stub logs its arguments, ACF_CONTEXT_DRIFT and the prompt it reads on stdin, then answers
-# per $CD_BIN/mode: a canned result (default), a non-zero exit, or a sleep past the timeout.
+# per $CD_BIN/mode: a canned result (default), a non-zero exit with a long stderr, output that is
+# not JSON, or a sleep past the timeout.
 cat > "$CD_BIN/claude" <<'STUB'
 #!/usr/bin/env bash
 dir="$(dirname "$0")"
 { echo "=== call"; printf 'ARG %s\n' "$@"; echo "ENV ACF_CONTEXT_DRIFT=${ACF_CONTEXT_DRIFT-}"; echo "PROMPT"; cat; } >> "$dir/log"
 case "$(cat "$dir/mode" 2>/dev/null)" in
-  fail) exit 1 ;;
+  fail) printf 'Invalid API key. Please run /login%0300d\n' 0 >&2; exit 1 ;;
+  garbage) echo "not json"; exit 0 ;;
   sleep) exec sleep 30 ;;
 esac
 cat "$dir/reply.json"
@@ -449,6 +451,30 @@ CLAUDE_CODE_SESSION_ATTENDED=0 cd_stop > "$CD_BIN/out.json"
 assert_ok "A non-interactive session is skipped" test ! -s "$CD_BIN/out.json" -a ! -e "$CD_BIN/log"
 CLAUDE_CODE_SESSION_ATTENDED=1 cd_stop > "$CD_BIN/out.json"
 assert_ok "An interactive session (SESSION_ATTENDED=1) is still checked" test -s "$CD_BIN/log"
+# "Turn this check off for this project" writes the env block into a settings file; the hook reads
+# the files itself, so the answer holds at the next turn whether or not Claude Code re-reads them.
+cd_asks() { rm -f "$CD_STATE/asked"; cd_stop > "$CD_BIN/out.json"; test -s "$CD_BIN/log" && jq -e '.decision == "block"' "$CD_BIN/out.json" >/dev/null; }
+cd_off() { rm -f "$CD_STATE/asked"; cd_stop > "$CD_BIN/out.json"; test ! -s "$CD_BIN/out.json" -a ! -e "$CD_BIN/log"; }
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store4.ts"
+printf '{"env": {"TOKEN": "TOPSECRETLOCAL", "ACF_CONTEXT_DRIFT": "off"}}\n' > "$CD_PROJ/.claude/settings.local.json"
+assert_ok "ACF_CONTEXT_DRIFT=off in .claude/settings.local.json: no judge call, no output" cd_off
+CD_SID="${CD_SID}_soff" cdrift '{hook_event_name: "SessionStart", source: "startup"}' > "$CD_BIN/out.json"
+assert_ok "ACF_CONTEXT_DRIFT=off in .claude/settings.local.json: session start takes no snapshot" test ! -s "$CD_BIN/out.json" -a ! -e "/tmp/agent_context_forge/drift_${CD_SID}_soff"
+printf '{"env": {"TOKEN": "TOPSECRETLOCAL"}}\n' > "$CD_PROJ/.claude/settings.local.json"
+printf '{"env": {"ACF_CONTEXT_DRIFT": "off"}}\n' > "$CD_PROJ/.claude/settings.json"
+assert_ok "ACF_CONTEXT_DRIFT=off in .claude/settings.json: no judge call, no output" cd_off
+printf '{"env": {"ACF_CONTEXT_DRIFT": "on"}}\n' > "$CD_PROJ/.claude/settings.local.json"
+assert_ok "settings.local.json overrides settings.json, as in Claude Code: a value other than off still asks" cd_asks
+rm -f "$CD_PROJ/.claude/settings.json"
+printf '{"env": {"TOKEN": "TOPSECRETLOCAL", "OTHER": "off"}}\n' > "$CD_PROJ/.claude/settings.local.json"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store5.ts"
+assert_ok "Another env variable set to off in settings.local.json still asks" cd_asks
+printf '{"env": {"ACF_CONTEXT_DRIFT": "off"' > "$CD_PROJ/.claude/settings.local.json"
+printf '["env", "ACF_CONTEXT_DRIFT", "off"]' > "$CD_PROJ/.claude/settings.json"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store6.ts"
+assert_ok "Malformed settings files never turn the check off and never break it" cd_asks
+rm -f "$CD_PROJ/.claude/settings.json"
+printf '{"env": {"TOKEN": "TOPSECRETLOCAL"}}\n' > "$CD_PROJ/.claude/settings.local.json"
 for bad in '' 'not json' '[]' '{"hook_event_name": "Stop", "session_id": 5}' '{"hook_event_name": "Stop", "cwd": 7}'; do
   assert_ok "Malformed input never breaks the session: ${bad:-empty}" cd_silent bash -c "printf '%s' '$bad' | PATH='$CD_BIN:$PATH' '$REPO_ROOT/.claude/hooks/context-drift.py'"
 done
@@ -478,6 +504,45 @@ mkdir -p "$CD_PROJ/bulk" && (cd "$CD_PROJ/bulk" && seq 1 10001 | sed 's/^/f/' | 
 printf 'export const a = 4;\n' > "$CD_PROJ/src/a.ts"
 assert_ok "An over-cap tree allows the stop silently" cd_silent cd_stop
 assert_ok "An over-cap tree never calls the judge" test ! -e "$CD_BIN/log"
+rm -rf "$CD_PROJ/bulk"
+cd_stop >/dev/null
+
+# ACF_CONTEXT_DRIFT_DEBUG=<file> appends one line per failure; unset, nothing is written anywhere
+CD_TRACE="$CD_BIN/trace.log"
+echo fail > "$CD_BIN/mode"
+printf 'export const a = 5;\n' > "$CD_PROJ/src/a.ts"
+cd_stop >/dev/null
+assert_ok "Without ACF_CONTEXT_DRIFT_DEBUG a failing judge writes no trace" test -s "$CD_BIN/log" -a ! -e "$CD_TRACE"
+printf 'export const a = 6;\n' > "$CD_PROJ/src/a.ts"
+cd_debug_stop() { ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" cd_stop; }
+assert_ok "With ACF_CONTEXT_DRIFT_DEBUG a judge that exits non-zero still allows the stop silently" cd_silent cd_debug_stop
+assert_ok "The trace names the session, the exit code and the start of the judge's stderr" bash -c "grep -F 'session=$CD_SID' '$CD_TRACE' | grep -F 'non-zero exit 1' | grep -qF 'Invalid API key. Please run /login'"
+assert_ok "The trace keeps at most 200 characters of stderr" bash -c "! grep -qE '0{200}' '$CD_TRACE'"
+assert_ok "The trace never holds the prompt, file contents or environment values" bash -c "! grep -qE 'Stack: TypeScript|export const|You audit|PrismaClient|TOPSECRET|sk-live' '$CD_TRACE'"
+printf 'export const a = 7;\n' > "$CD_PROJ/src/a.ts"
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" ACF_CONTEXT_DRIFT_TIMEOUT=999 cd_stop >/dev/null
+assert_ok "ACF_CONTEXT_DRIFT_TIMEOUT can only shorten the 150 s judge timeout" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'limit 150 s'"
+printf 'export const a = 8;\n' > "$CD_PROJ/src/a.ts"
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" ACF_CONTEXT_DRIFT_TIMEOUT=40 cd_stop >/dev/null
+assert_ok "A shorter ACF_CONTEXT_DRIFT_TIMEOUT is used as given" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'limit 40 s'"
+echo garbage > "$CD_BIN/mode"
+printf 'export const a = 9;\n' > "$CD_PROJ/src/a.ts"
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" cd_stop >/dev/null
+assert_ok "The trace records output that is not JSON" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'unparseable output'"
+echo sleep > "$CD_BIN/mode"
+printf 'export const a = 10;\n' > "$CD_PROJ/src/a.ts"
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" ACF_CONTEXT_DRIFT_TIMEOUT=2 cd_stop >/dev/null
+assert_ok "The trace records a timeout" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'timeout'"
+rm -f "$CD_BIN/mode"
+printf 'export const a = 11;\n' > "$CD_PROJ/src/a.ts"
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" cd_noclaude >/dev/null
+assert_ok "The trace records a missing claude" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'claude not found'"
+mkdir -p "$CD_PROJ/bulk" && (cd "$CD_PROJ/bulk" && seq 1 10001 | sed 's/^/f/' | xargs touch)
+ACF_CONTEXT_DRIFT_DEBUG="$CD_TRACE" cd_stop >/dev/null
+assert_ok "The trace records a tree over the file cap" bash -c "tail -n 1 '$CD_TRACE' | grep -qF 'over file cap'"
+ACF_CONTEXT_DRIFT_DEBUG="/nonexistent-dir/trace.log" cd_stop > "$CD_BIN/out.json" 2>&1
+assert_ok "An unwritable trace path never breaks the hook" test ! -s "$CD_BIN/out.json"
+rm -rf "$CD_PROJ/bulk"
 
 # A project with no context files has nothing to go stale
 CD_NOCTX="$(mktemp -d)"
@@ -486,6 +551,23 @@ CD_PROJ="$CD_NOCTX" CD_SID="${CD_SID}_noctx" cdrift '{hook_event_name: "SessionS
 printf '{"name": "x", "dependencies": {"prisma": "^5.0.0"}}\n' > "$CD_NOCTX/package.json"
 CD_PROJ="$CD_NOCTX" CD_SID="${CD_SID}_noctx" cd_stop >/dev/null
 assert_ok "No context files means no judge call" test ! -e "$CD_BIN/log"
+
+# Session start prunes other sessions' snapshots older than 3 days, and nothing else
+CD_ROOT="/tmp/agent_context_forge"
+CD_KEEP="$(mktemp -d)"
+mkdir -p "$CD_ROOT/drift_${CD_SID}_old/snapshot" "$CD_ROOT/drift_${CD_SID}_fresh/snapshot" "$CD_ROOT/other_${CD_SID}_old"
+for d in "drift_${CD_SID}_old" "drift_${CD_SID}_fresh" "other_${CD_SID}_old"; do printf '{}' > "$CD_ROOT/$d/manifest.json"; done
+printf '{}' > "$CD_KEEP/manifest.json"
+ln -s "$CD_KEEP" "$CD_ROOT/drift_${CD_SID}_link"
+touch -t 202001010000 "$CD_ROOT/drift_${CD_SID}_old/manifest.json" "$CD_ROOT/other_${CD_SID}_old/manifest.json" "$CD_KEEP/manifest.json" "${CD_STATE}_noctx/manifest.json"
+CD_PROJ="$CD_NOCTX" CD_SID="${CD_SID}_noctx" cdrift '{hook_event_name: "SessionStart", source: "resume"}' > "$CD_BIN/out.json"
+assert_ok "Session start says nothing while pruning" test ! -s "$CD_BIN/out.json"
+assert_ok "A snapshot dir older than 3 days is pruned" test ! -e "$CD_ROOT/drift_${CD_SID}_old"
+assert_ok "A fresh snapshot dir of another session is kept" test -f "$CD_ROOT/drift_${CD_SID}_fresh/manifest.json"
+assert_ok "The current session's dir is never pruned, however old" test -f "${CD_STATE}_noctx/manifest.json"
+assert_ok "A dir not named drift_* is never pruned" test -f "$CD_ROOT/other_${CD_SID}_old/manifest.json"
+assert_ok "A symlink named drift_* is never followed or removed" test -L "$CD_ROOT/drift_${CD_SID}_link" -a -f "$CD_KEEP/manifest.json"
+rm -rf "$CD_ROOT/drift_${CD_SID}_fresh" "$CD_ROOT/other_${CD_SID}_old" "$CD_ROOT/drift_${CD_SID}_link" "$CD_KEEP"
 
 # --judge-dirs BEFORE AFTER (the scorer's interface): only verified findings survive
 CD_DIRS="$(mktemp -d)"
@@ -497,7 +579,7 @@ JUDGED="$(PATH="$CD_BIN:$PATH" "$REPO_ROOT/.claude/hooks/context-drift.py" --jud
 assert_ok "--judge-dirs keeps a verified finding and names its file" jq -e '.ask and (.reasons[0] | test("moved to a database")) and .stale_files == ["CLAUDE.md"]' <<<"$JUDGED"
 assert_ok "Findings whose quote is not in the context files are dropped" jq -e '[.reasons[] | select(test("quote is invented"))] | length == 0' <<<"$JUDGED"
 assert_ok "Findings whose evidence is not in the diff are dropped" jq -e '(.reasons | length == 1) and ([.reasons[] | select(test("evidence is invented"))] | length == 0)' <<<"$JUDGED"
-rm -rf "$CD_PROJ" "$CD_BIN" "$NOCLAUDE_BIN" "$CD_NOCTX" "$CD_DIRS" "$CD_STATE" "${CD_STATE}_noctx" "${CD_STATE}_off"
+rm -rf "$CD_PROJ" "$CD_BIN" "$NOCLAUDE_BIN" "$CD_NOCTX" "$CD_DIRS" "$CD_STATE" "${CD_STATE}_noctx" "${CD_STATE}_off" "${CD_STATE}_soff" "${CD_STATE}_old"
 
 echo "---------------------------------------------------"
 printf 'Passed: %d | Failed: %d\n' "$PASS" "$FAIL"

@@ -118,14 +118,23 @@ quote verification, retry, cost cap, fail-open). Scorer: `.../scratchpad/score.p
 - macOS and Linux; Python 3 stdlib and the `claude` CLI only; no new npm dependencies.
 - Hook scripts must never raise to the user: any error is silent and allows the stop.
 
-## Open technical risk: verify before building the rest
+## Spike result (Stop hook asking a question)
 
-The existing `stop()` in `context-stability.py` emits `additionalContext` for `Stop`. It is not established
-that this makes Claude continue, nor that Claude can call `AskUserQuestion` after a blocking Stop hook.
-Step one of the plan is a throwaway spike: a minimal Stop hook in a scratch project that returns the
-blocking decision with a reason telling Claude to ask a question; confirm Claude continues and asks. If
-`AskUserQuestion` is not available there, fall back to a plain-text question in the terminal and say so.
-The interactive last step needs a human at the terminal.
+Confirmed on 2026-11-10 with a throwaway hook in a scratch project:
+
+- A top-level `{"decision":"block","reason":...}` from a `Stop` hook makes Claude continue once. The hook
+  runs again with `stop_hook_active: true`, so it can stay silent the second time; there was no loop.
+  In an interactive session, Claude showed the question with the offered options, the user picked
+  "Update now", and Claude acted on that choice. (`additionalContext`, the shape `context-stability.py`
+  uses for `Stop`, also made Claude continue under `claude -p`; it was not tried interactively. This design
+  uses the block shape.)
+- Interactive sessions have `CLAUDE_CODE_SESSION_ATTENDED=1` and `CLAUDE_CODE_ENTRYPOINT=cli`; `claude -p`
+  has `0` and `sdk-cli`. The hook skips only when `CLAUDE_CODE_SESSION_ATTENDED` is `"0"`, so an older
+  Claude Code that does not set it still asks.
+- The `Stop` stdin carries `stop_hook_active`, `last_assistant_message`, `session_id`, `cwd` and
+  `transcript_path`, among others.
+- `AskUserQuestion` is not in the tool list under `claude -p`; there Claude fell back to plain text with
+  the same options. That is why the non-interactive skip matters.
 
 ## Left to the builder
 

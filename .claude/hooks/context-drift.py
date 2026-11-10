@@ -59,8 +59,14 @@ JUDGE_TIMEOUT = 150  # seconds; ACF_CONTEXT_DRIFT_TIMEOUT overrides
 JUDGE_BUDGET_USD = "0.05"
 JUDGE_MODEL = "haiku"
 
-SKIP_DIRS = {".git", "node_modules", "dist", "build", ".next", "__pycache__", ".venv", "venv", "target",
-             ".hg", ".svn", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".turbo", ".cache", "coverage"}
+# Dependencies, build output and caches: rewritten by tools, never what the context files describe.
+# A generated dir that sorts before src/ would otherwise fill the diff limit first. bin/ is kept:
+# it often holds real entry points.
+SKIP_DIRS = {".git", ".hg", ".svn",
+             "node_modules", "vendor", "Pods", ".venv", "venv", "env", ".tox", ".dart_tool", ".gradle", ".terraform",
+             "dist", "build", "out", "target", "obj", "coverage", ".output",
+             ".next", ".nuxt", ".svelte-kit", ".angular", ".expo", ".turbo", ".parcel-cache", ".cache",
+             "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
 LOCKFILES = {"package-lock.json", "pnpm-lock.yaml", "yarn.lock", "Cargo.lock", "poetry.lock",
              "Pipfile.lock", "bun.lockb", "Gemfile.lock", "composer.lock", "go.sum", "uv.lock"}
 # Matched against every path component, lowercased

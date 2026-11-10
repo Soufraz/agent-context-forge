@@ -398,6 +398,19 @@ cdrift '{hook_event_name: "SessionStart", source: "resume"}' >/dev/null
 cd_stop >/dev/null
 assert_ok "Compaction and resume keep the snapshot" grep -qF '+app.get("/health", () => "ok");' "$CD_BIN/log"
 
+# Generated output (.nuxt sorts before src/) must not push the real change out of the 40,000-char diff
+mkdir -p "$CD_PROJ/.nuxt" "$CD_PROJ/vendor/pkg"
+printf 'x\n' | tee "$CD_PROJ/.nuxt/app.js" > "$CD_PROJ/vendor/pkg/lib.js"
+cdrift '{hook_event_name: "Stop", stop_hook_active: false}' >/dev/null
+python3 -c 'print("GENERATED_MARKER " * 3000)' | tee "$CD_PROJ/.nuxt/app.js" > "$CD_PROJ/vendor/pkg/lib.js"
+printf 'export const port = 4000;\n' > "$CD_PROJ/src/config.ts"
+cd_stop >/dev/null
+assert_ok "Generated dirs never reach the prompt; the source change does" bash -c "grep -qF '+export const port = 4000;' '$CD_BIN/log' && ! grep -qF 'GENERATED_MARKER' '$CD_BIN/log'"
+(cd "$CD_PROJ/vendor/pkg" && seq 1 10001 | sed 's/^/v/' | xargs touch)
+printf 'export const port = 5000;\n' > "$CD_PROJ/src/config.ts"
+cd_stop >/dev/null
+assert_ok "A large vendor/ never trips the file cap" grep -qF '+export const port = 5000;' "$CD_BIN/log"
+
 # Failures and an over-cap tree allow the stop: no output, exit 0
 cd_silent() { local out rc=0; out="$("$@" 2>&1)" || rc=$?; test -z "$out" -a "$rc" -eq 0; }
 NOCLAUDE_BIN="$(mktemp -d)"

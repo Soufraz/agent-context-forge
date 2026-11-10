@@ -351,12 +351,14 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
-  test("explainContextDrift: states that source diffs are sent to a model through claude -p under the user's login, the typical cost, and the off switch", () => {
+  test("explainContextDrift: states that source diffs are sent to a model through claude -p under the user's login, the typical cost and its ceiling, when it skips the model, and the off switch", () => {
     const text = explainContextDrift();
     assert.match(text, /claude -p/);
     assert.match(text, /diff/);
     assert.match(text, /login/);
     assert.match(text, /\$0\.001-0\.002/);
+    assert.match(text, /at most about \$0\.05/);
+    assert.match(text, /docs other than the\s+context files, tests or formatting skips the model call/);
     assert.match(text, /never edits/);
     assert.match(text, /ACF_CONTEXT_DRIFT=off/);
     assert.match(text, /\.claude\/settings\.json/);

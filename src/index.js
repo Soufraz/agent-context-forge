@@ -254,7 +254,8 @@ export function explainContextDrift() {
     'whether CLAUDE.md, AGENTS.md or the rule files now say something false.\n' +
     "That sends those files and the code diff of the turn to a Claude model through `claude -p`, under your\n" +
     'own Claude Code login. It adds about 7 seconds to such a turn and typically costs $0.001-0.002 per\n' +
-    'check. A turn that only changed docs, tests or formatting skips the model call.\n' +
+    'check; the budget per check is at most about $0.05. A turn that only changed docs other than the\n' +
+    'context files, tests or formatting skips the model call.\n' +
     'If it finds a stale sentence, it asks you in the terminal whether to update the context files; it\n' +
     'never edits them without your yes.\n' +
     'To turn it off: answer no here, or set ACF_CONTEXT_DRIFT=off in the `env` block of .claude/settings.json.'
@@ -502,7 +503,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +
       `• Claude Hooks: .claude/settings.json\n` +
       `• Pre-flight Doctor: ./scripts/agent-gates/doctor.sh\n` +
-      `• Context drift check: ${contextDrift === 'on' ? 'on (ACF_CONTEXT_DRIFT=off in .claude/settings.json turns it off)' : 'off (re-run this wizard to turn it on)'}\n` +
+      `• Context drift check: ${contextDrift === 'on' ? 'on (ACF_CONTEXT_DRIFT=off in the \`env\` block of .claude/settings.json turns it off)' : 'off (re-run this wizard to turn it on)'}\n` +
       `• Optional Universal Git Hook: git config core.hooksPath .githooks`,
     'Next Steps'
   );

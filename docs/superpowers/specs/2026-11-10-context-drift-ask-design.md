@@ -33,7 +33,7 @@ ask, 24 should not (including already-synced cases where the agent updated the f
 | One haiku call: context files + diff | 24/24 | 21/24 | 0/24 |
 
 The free detectors were tuned on data they had read and did not generalize. The model judge was not
-retuned on the held-out set. Its three misses are all "the context is still literally true but now
+retuned on the held-out set. The prototype's three misses were all "the context is still literally true but now
 incomplete" (a new job system, a new tenancy rule, a new worker). About 7 s per check; about $0.001-0.002
 typical, with two outliers near $0.18 in 5 full runs. Limits: synthetic scenarios written by a model, 24
 negatives only (0 false alarms means an upper bound near 12%), not yet measured on real sessions.
@@ -98,7 +98,7 @@ quote verification, retry, cost cap, fail-open). Scorer: `.../scratchpad/score.p
 - Does not edit context files without the user's yes.
 - Does not detect staleness that existed before the turn.
 - Does not replace the commit gate or the existing drift check (paths, scripts, make targets).
-- No claim that it catches "incomplete but still true" context reliably; it caught 0 of 3 such cases.
+- No claim that it catches "incomplete but still true" context reliably; on the held-out set the prototype caught 0 of 3 such cases and the shipped hook 1 of 3.
 
 ## Anti-goals (failure even if it technically works)
 

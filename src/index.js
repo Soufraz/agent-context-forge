@@ -3,7 +3,7 @@ import path from 'node:path';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { inspectDirectory } from './detector.js';
-import { scaffoldProject } from './scaffolder.js';
+import { scaffoldProject, isExistingInstall, installedContextDrift } from './scaffolder.js';
 import { auditProject } from './scanner/index.js';
 import { generateHtmlReport } from './reporter/html-template.js';
 import { openInBrowser } from './reporter/open-browser.js';
@@ -246,6 +246,22 @@ async function offerAutoCompact(targetDir) {
 }
 
 /**
+ * Tells the user what the context drift check sends and costs, before they choose.
+ */
+export function explainContextDrift() {
+  return (
+    'Context drift check: after a turn that changed source code or the context files, a hook checks\n' +
+    'whether CLAUDE.md, AGENTS.md or the rule files now say something false.\n' +
+    "That sends those files and the code diff of the turn to a Claude model through `claude -p`, under your\n" +
+    'own Claude Code login. It adds about 7 seconds to such a turn and typically costs $0.001-0.002 per\n' +
+    'check. A turn that only changed docs, tests or formatting skips the model call.\n' +
+    'If it finds a stale sentence, it asks you in the terminal whether to update the context files; it\n' +
+    'never edits them without your yes.\n' +
+    'To turn it off: answer no here, or set ACF_CONTEXT_DRIFT=off in the `env` block of .claude/settings.json.'
+  );
+}
+
+/**
  * Runs the interactive stack customization wizard and scaffolds the harness.
  */
 async function runCustomizationWizardAndScaffold(targetDir, engine) {
@@ -429,6 +445,15 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     };
   }
 
+  // The check sends project files and diffs to a model, so say so before asking.
+  p.log.warn(explainContextDrift());
+  const driftEnabled = await p.confirm({
+    message: 'Turn the context drift check on?',
+    initialValue: !isExistingInstall(targetDir) || installedContextDrift(targetDir) === 'on'
+  });
+  if (p.isCancel(driftEnabled)) process.exit(0);
+  const contextDrift = driftEnabled ? 'on' : 'off';
+
   const spinner = p.spinner();
   spinner.start('Scaffolding Agent Context Forge harness into repository...');
 
@@ -439,6 +464,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     subagentIsolation: subagentChoice,
     episodicMemory: memoryChoice,
     sdd: sddChoice,
+    contextDrift,
     projectContext
   });
 
@@ -476,6 +502,7 @@ async function runCustomizationWizardAndScaffold(targetDir, engine) {
     `• Tier-1 Rules: CLAUDE.md & AGENTS.md\n` +
       `• Claude Hooks: .claude/settings.json\n` +
       `• Pre-flight Doctor: ./scripts/agent-gates/doctor.sh\n` +
+      `• Context drift check: ${contextDrift === 'on' ? 'on (ACF_CONTEXT_DRIFT=off in .claude/settings.json turns it off)' : 'off (re-run this wizard to turn it on)'}\n` +
       `• Optional Universal Git Hook: git config core.hooksPath .githooks`,
     'Next Steps'
   );

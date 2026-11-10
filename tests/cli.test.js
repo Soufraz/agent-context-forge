@@ -7,7 +7,8 @@ import { execSync } from 'node:child_process';
 
 import { inspectDirectory } from '../src/detector.js';
 import { generateProjectContext } from '../src/context-generator.js';
-import { scaffoldProject, isExistingInstall, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
+import { scaffoldProject, isExistingInstall, installedContextDrift, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
+import { explainContextDrift } from '../src/index.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 import { buildUsageReport, formatUsageReport, projectTranscriptDir } from '../src/usage-report.js';
@@ -335,6 +336,31 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.equal(isExistingInstall(tmpProject), true);
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test("installedContextDrift: null for a new project, 'on' or 'off' as the manifest records it", () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_installed_drift_'));
+    assert.equal(installedContextDrift(tmpProject), null);
+
+    scaffoldProject(tmpProject, { contextDrift: 'on' });
+    assert.equal(installedContextDrift(tmpProject), 'on');
+
+    scaffoldProject(tmpProject, { contextDrift: 'off' });
+    assert.equal(installedContextDrift(tmpProject), 'off');
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test("explainContextDrift: states that source diffs are sent to a model through claude -p under the user's login, the typical cost, and the off switch", () => {
+    const text = explainContextDrift();
+    assert.match(text, /claude -p/);
+    assert.match(text, /diff/);
+    assert.match(text, /login/);
+    assert.match(text, /\$0\.001-0\.002/);
+    assert.match(text, /never edits/);
+    assert.match(text, /ACF_CONTEXT_DRIFT=off/);
+    assert.match(text, /\.claude\/settings\.json/);
+    assert.ok(text.split('\n').length <= 10, 'stays short enough for a terminal');
   });
 
   test('auditPillar1: measures what Claude Code loads, following @imports', () => {

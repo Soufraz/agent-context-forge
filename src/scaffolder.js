@@ -85,6 +85,12 @@ const readManifest = (targetDir) => {
  */
 export const isExistingInstall = (targetDir) => readManifest(targetDir) !== null;
 
+/** The context drift setting an earlier install recorded: 'on', 'off', or null when there is no install. */
+export const installedContextDrift = (targetDir) => {
+  const manifest = readManifest(targetDir);
+  return manifest ? (manifest.contextDrift === 'on' ? 'on' : 'off') : null;
+};
+
 const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
 
 const isHarnessHook = (hook) =>

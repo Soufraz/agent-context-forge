@@ -4,3 +4,5 @@ Thumbs.db
 *.log
 .agent-context-report.html
 /tmp/agent_context_forge/
+__pycache__/
+*.pyc

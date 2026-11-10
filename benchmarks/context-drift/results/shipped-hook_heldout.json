@@ -1,0 +1,356 @@
+{
+ "summary": {
+  "n": 48,
+  "recall": "22/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 6.25,
+  "flow": "recall 5/6, false alarms 0/6",
+  "principles": "recall 5/6, false alarms 0/6",
+  "purpose": "recall 6/6, false alarms 0/6",
+  "stack": "recall 6/6, false alarms 0/6",
+  "missed": [
+   "h-flow-05-alerts-oban",
+   "h-principles-05-rosterly-multi-org"
+  ],
+  "false_alarm_ids": []
+ },
+ "rows": [
+  {
+   "id": "h-flow-01-report-queue",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-flow-02-ledger-second-writer",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-flow-03-orders-webhook",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-flow-04-rust-workspace",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-flow-05-alerts-oban",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": false
+  },
+  {
+   "id": "h-flow-06-kotlin-outbox",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-flow-07-php-repo-cleanup",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-flow-08-dotnet-seed-tool",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-flow-09-worker-retries",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-flow-10-node-rule-helpers",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-flow-11-split-prober",
+   "category": "flow",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-flow-12-state-to-sqlite",
+   "category": "flow",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-01-ledgerly-coupons",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-principles-02-kurz-hot-cache",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-principles-03-tidepool-snake-case",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-principles-04-logtally-json-flags",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-principles-05-rosterly-multi-org",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": false
+  },
+  {
+   "id": "h-principles-06-parcelhub-stocktake-import",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-principles-07-relay-teams-sender",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-08-tillpoint-vat-lines",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-09-pantrypal-recipe-tags",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-10-quaywatch-split-handlers",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-11-dotsync-yaml-config",
+   "category": "principles",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-principles-12-pulsefeed-epoch-ms",
+   "category": "principles",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-01-tallyho",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-02-quietread",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-03-cairn",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-04-hearthbook",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-05-rollcall",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-06-swapshelf",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-purpose-07-fieldnotes",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-08-tendril",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-09-snipdrop",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-10-shiftboard",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-11-tidepool",
+   "category": "purpose",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-purpose-12-brewlog",
+   "category": "purpose",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-01-locked-installs",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-02-on-device",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-03-cluster-move",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-04-slow-checkout",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-05-shared-conventions",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-06-test-setup",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "h-stack-07-framework-upgrade",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-08-local-db-compose",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-09-dependency-refresh",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-10-schema-naming",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-11-managed-postgres",
+   "category": "stack",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "h-stack-12-probe-client",
+   "category": "stack",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  }
+ ]
+}

@@ -1,0 +1,49 @@
+{
+ "r1": {
+  "n": 48,
+  "recall": "24/24",
+  "false_alarms": "1/24",
+  "errors": 0,
+  "avg_secs": 6.43,
+  "missed": [],
+  "false_alarm_ids": [
+   "flow-11-split-into-workspaces-synced"
+  ]
+ },
+ "r2": {
+  "n": 48,
+  "recall": "24/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 6.24,
+  "missed": [],
+  "false_alarm_ids": []
+ },
+ "r3": {
+  "n": 48,
+  "recall": "24/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 6.06,
+  "missed": [],
+  "false_alarm_ids": []
+ },
+ "r4": {
+  "n": 48,
+  "recall": "24/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 5.91,
+  "missed": [],
+  "false_alarm_ids": []
+ },
+ "r5": {
+  "n": 48,
+  "recall": "24/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 5.8,
+  "missed": [],
+  "false_alarm_ids": []
+ }
+}

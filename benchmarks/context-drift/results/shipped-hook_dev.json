@@ -1,0 +1,355 @@
+{
+ "summary": {
+  "n": 48,
+  "recall": "23/24",
+  "false_alarms": "0/24",
+  "errors": 0,
+  "avg_secs": 6.14,
+  "flow": "recall 6/6, false alarms 0/6",
+  "principles": "recall 6/6, false alarms 0/6",
+  "purpose": "recall 6/6, false alarms 0/6",
+  "stack": "recall 5/6, false alarms 0/6",
+  "missed": [
+   "stack-06-vue-to-react-web-only"
+  ],
+  "false_alarm_ids": []
+ },
+ "rows": [
+  {
+   "id": "flow-01-split-into-workspaces",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-02-cli-entry-moved-to-bin",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-03-sqlite-to-hosted-api",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-04-receipts-to-background-queue",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-05-remove-service-layer",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-06-realtime-sync-subsystem",
+   "category": "flow",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "flow-07-refactor-movecard",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "flow-08-rename-helpers-add-rule",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "flow-09-extract-schemas-add-tags",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "flow-10-prettier-style-churn",
+   "category": "flow",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "flow-11-split-into-workspaces-synced",
+   "category": "flow",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "flow-12-receipts-to-background-queue-synced",
+   "category": "flow",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-01-offline-notes-s3-sync",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-02-zero-dep-slug-adds-transliteration",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-03-ledger-jest-to-vitest",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-04-parcelwatch-result-tuples-to-exceptions",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-05-mailnest-encrypt-emails-at-rest",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-06-streaming-csv-sort-buffers-all",
+   "category": "principles",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "principles-07-tasklark-split-commands-per-file",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-08-bytefmt-dev-lint-and-ci",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-09-offline-notes-local-search",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-10-streaming-csv-percentile-allowed-exception",
+   "category": "principles",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-11-ledger-jest-to-vitest-synced",
+   "category": "principles",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "principles-12-zero-dep-slug-adds-transliteration-synced",
+   "category": "principles",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-01-todo-to-habit-tracker",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-02-single-user-gets-accounts",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-03-offline-gains-cloud-sync",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-04-personal-cli-goes-public",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-05-fourth-column-blocked",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-06-static-blog-becomes-print-shop",
+   "category": "purpose",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "purpose-07-search-tags-palette-in-scope",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-08-snes-crt-polish-and-sfx",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-09-rename-columns-and-copy",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-10-perf-and-scaling-bugfixes",
+   "category": "purpose",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-11-habit-pivot-already-synced",
+   "category": "purpose",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "purpose-12-accounts-already-synced",
+   "category": "purpose",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-01-express-to-fastapi-rewrite",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "stack-02-express-to-fastify",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "stack-03-sqlite-to-postgres",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "stack-04-npm-to-pnpm",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "stack-05-jest-to-vitest",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": true
+  },
+  {
+   "id": "stack-06-vue-to-react-web-only",
+   "category": "stack",
+   "kind": "positive",
+   "expected": true,
+   "ask": false
+  },
+  {
+   "id": "stack-07-add-eslint-prettier",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-08-express-4-to-5-upgrade",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-09-dep-refresh-and-script-rename",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-10-add-zod-validation",
+   "category": "stack",
+   "kind": "negative",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-11-sqlite-to-postgres-synced",
+   "category": "stack",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  },
+  {
+   "id": "stack-12-jest-to-vitest-synced",
+   "category": "stack",
+   "kind": "already-synced",
+   "expected": false,
+   "ask": false
+  }
+ ]
+}

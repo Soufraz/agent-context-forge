@@ -15,7 +15,7 @@
 
 ## 3. Repository Structure & On-Demand Pointers
 - `.claude/settings.json` — Hook bindings (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PreCompact`, `Stop`), including the whole-file read guard for lockfiles and bundles.
-- `.claude/hooks/` — Automated guardrails for prefix stability, subagent isolation, command compression, and context stability (rules captured across compaction, rule gates from `.claude/enforced-rules.json`).
+- `.claude/hooks/` — Automated guardrails for prefix stability, subagent isolation, command compression, and context stability (rules captured across compaction, rule gates from `.claude/enforced-rules.json`). `context-drift.py` is the hook `acf` installs into projects (not bound in this repo's own settings): it asks the user before a turn ends with context files it made untrue; evidence in `benchmarks/context-drift/`.
 - `scripts/agent-gates/` — Portable environment health checks for LSP, `rtk`, and Episodic Auto-Memory.
 - `.agents/rules/` — Portable cross-agent rule definitions.
 - `.githooks/` — Standard Git hook wrappers for CLI and IDE commits.

@@ -356,6 +356,7 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     assert.match(text, /claude -p/);
     assert.match(text, /diff/);
     assert.match(text, /login/);
+    assert.match(text, /secret files like \.env\* are never sent/);
     assert.match(text, /\$0\.001-0\.002/);
     assert.match(text, /at most about \$0\.05 \(not a hard cap\)/);
     assert.match(text, /docs other than the\s+context files, tests or formatting skips the model call/);

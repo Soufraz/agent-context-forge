@@ -253,9 +253,9 @@ export function explainContextDrift() {
     'Context drift check: after a turn that changed source code or the context files, a hook checks\n' +
     'whether CLAUDE.md, AGENTS.md or the rule files now say something false.\n' +
     "That sends those files and the code diff of the turn to a Claude model through `claude -p`, under your\n" +
-    'own Claude Code login. It adds about 7 seconds to such a turn and typically costs $0.001-0.002 per\n' +
-    'check; the budget per check is at most about $0.05 (not a hard cap). A turn that only changed\n' +
-    'docs other than the context files, tests or formatting skips the model call.\n' +
+    'own Claude Code login (secret files like .env* are never sent). It adds about 7 seconds to such a turn\n' +
+    'and typically costs $0.001-0.002 per check; the budget per check is at most about $0.05 (not a hard cap).\n' +
+    'A turn that only changed docs other than the context files, tests or formatting skips the model call.\n' +
     'If it finds a stale sentence, it asks you in the terminal whether to update the context files; it\n' +
     'never edits them without your yes.\n' +
     'To turn it off: answer no here, or set ACF_CONTEXT_DRIFT=off in the `env` block of .claude/settings.json.'

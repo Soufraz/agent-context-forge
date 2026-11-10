@@ -58,9 +58,9 @@ Caught is out of 24 positives; false alarms are out of 24 negatives.
   on a dev failure.
 * **Delay and cost, as seen while developing.** The shipped hook averaged 6.14 s per scenario on dev
   and 6.25 s on held-out (`avg_secs` in the result files), so plan on about 7 s. Cost was typically
-  $0.001 to $0.002 per check; per-check cost is not recorded in `results/`. A few large diffs cost
-  far more, up to about $0.18 for one call. The hook sets a budget of $0.05 per check; that flag is
-  not a hard cap, and a call did exceed it. Past the budget or the 150-second timeout the stop goes
+  $0.001 to $0.002 per check; per-check cost is not recorded in `results/`. One call (a prototype
+  run, with the same budget flag and diff limit) cost about $0.18. The hook sets a budget of $0.05
+  per check; that flag is not a hard cap, and that call exceeded it. Past the budget or the 150-second timeout the stop goes
   through without a question.
 * **When it does not run.** A turn that only changed docs other than the context files, tests or
   formatting makes no model call. Docs that are context files (`CLAUDE.md`, `AGENTS.md`, rule files)
@@ -78,7 +78,9 @@ Caught is out of 24 positives; false alarms are out of 24 negatives.
   set existed; the held-out set was not used to change it.
 * **Incomplete but still true.** When a turn adds something the files never mention (a job system,
   a tenancy rule, a worker) and no existing sentence becomes false, detection is poor. The held-out
-  set holds four such scenarios: the prototype caught one, the shipped hook two, in one run each.
+  set holds three such scenarios (`h-flow-05-alerts-oban`, `h-principles-05-rosterly-multi-org`,
+  `h-stack-04-slow-checkout`): the prototype caught 0 of 3, the shipped hook 1 of 3 (`h-stack-04`),
+  in one run each.
   Do not rely on the check to tell you that the files are incomplete.
 * **Partial staleness** can slip through, as in `stack-06-vue-to-react-web-only`.
 * **One run per detector per set**, except the five dev runs of the prototype in

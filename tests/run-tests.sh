@@ -25,7 +25,7 @@ assert_ok() {
 echo "=== Running Agent Context Forge Self-Test Suite ==="
 
 # 1. Validate .claude/settings.json structure
-echo "[1/7] Checking .claude/settings.json configuration..."
+echo "[1/8] Checking .claude/settings.json configuration..."
 assert_ok "Valid JSON syntax" jq empty .claude/settings.json
 assert_ok "No Read deny rules, which would block grep on lockfiles (Pillar 2)" jq -e '(.permissions.deny // []) | map(select(test("lock"))) | length == 0' .claude/settings.json
 assert_ok "Whole-file read guard wired on Read (Pillar 2)" jq -e '[.hooks.PreToolUse[] | select(.matcher == "Read") | .hooks[].command | select(test("guard-whole-file-reads"))] | length == 1' .claude/settings.json
@@ -33,13 +33,13 @@ assert_ok "SessionStart runs session-context.sh" jq -e '.hooks.SessionStart[0].h
 assert_ok "SessionStart, PreToolUse & PreCompact hooks wired" jq -e '.hooks.SessionStart and .hooks.PreToolUse and .hooks.PreCompact' .claude/settings.json
 
 # 2. Validate Environment Doctor (Pillars 2, 3, 5)
-echo "[2/7] Checking scripts/agent-gates/doctor.sh..."
+echo "[2/8] Checking scripts/agent-gates/doctor.sh..."
 DOCTOR_OUT="$("$REPO_ROOT/scripts/agent-gates/doctor.sh")"
 assert_ok "doctor.sh exits 0 and produces output" test -n "$DOCTOR_OUT"
 assert_ok "check-memory.sh reports Episodic Memory status" grep -q "Episodic Memory" <<<"$DOCTOR_OUT"
 
 # 3. Validate Prefix Stability Fast-Filter (Pillar 1)
-echo "[3/7] Checking pre-commit-prefix-stability.sh fast filter..."
+echo "[3/8] Checking pre-commit-prefix-stability.sh fast filter..."
 FAST_OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"git status"}}' | "$REPO_ROOT/.claude/hooks/pre-commit-prefix-stability.sh")"
 assert_ok "Non-commit Bash command bypasses LLM gate with 0 output" test -z "$FAST_OUT"
 
@@ -73,7 +73,7 @@ assert_ok "Commit with unstaged CLAUDE.md change runs the model audit" test -e "
 rm -rf "$GATE_REPO" "$GATE_BIN" "$OTHER_REPO"
 
 # 4. Validate RTK Command Rewriter (Pillar 3)
-echo "[4/7] Checking rewrite-rtk.sh command compression hook..."
+echo "[4/8] Checking rewrite-rtk.sh command compression hook..."
 MOCK_BIN="$(mktemp -d)"
 # Emulates `rtk hook claude`: prefixes the command with rtk
 cat > "$MOCK_BIN/rtk" <<'EOF'
@@ -116,7 +116,7 @@ fi
 rm -rf "$MOCK_BIN" "$RTK_HOME" "$RTK_PROJECT"
 
 # 5. Validate Subagent Isolation Guardrail (Pillar 4) & PreCompact Handover (Pillar 5)
-echo "[5/7] Checking guard-subagent-isolation.py & pre-compact-handover.sh..."
+echo "[5/8] Checking guard-subagent-isolation.py & pre-compact-handover.sh..."
 TEST_SID="test_suite_$$"
 rm -f "/tmp/agent_context_forge/exploration_${TEST_SID}.json"
 
@@ -158,7 +158,7 @@ COMPACT_OUT="$("$REPO_ROOT/.claude/hooks/pre-compact-handover.sh")"
 assert_ok "pre-compact-handover.sh outputs preservation instructions" grep -q "Context Compaction Handover Guardrail" <<<"$COMPACT_OUT"
 
 # 6. Validate whole-file read guard (Pillar 2) & session facts
-echo "[6/7] Checking guard-whole-file-reads.sh & session-context.sh..."
+echo "[6/8] Checking guard-whole-file-reads.sh & session-context.sh..."
 read_guard() {
   printf '%s' "$1" | "$REPO_ROOT/.claude/hooks/guard-whole-file-reads.sh"
 }
@@ -177,7 +177,7 @@ assert_ok "Session facts contain no paths" jq -e --arg d "$FACTS_DIR" '.hookSpec
 rm -rf "$FACTS_DIR"
 
 # 7. Validate context-stability.py: rule capture across compaction and rule gates
-echo "[7/7] Checking context-stability.py rule capture & gates..."
+echo "[7/8] Checking context-stability.py rule capture & gates..."
 STAB_DIR="$(mktemp -d)"
 STAB_SID="test_stability_$$"
 git -C "$STAB_DIR" init -q
@@ -329,6 +329,121 @@ assert_ok "git hook mode fails when the staged package.json drops the script" ba
 printf '{"scripts":{"lint":"biome check","build":"tsc"}}' > "$DRIFT_DIR/package.json"
 assert_ok "Drift check allows changing a script that keeps its name" test -z "$(drift_deny 'git add package.json && git commit -m x')"
 rm -rf "$DRIFT_DIR"
+
+# 8. Validate context-drift.py: snapshot, content diff, gate and judge (the judge is a stub claude)
+echo "[8/8] Checking context-drift.py snapshot, diff, gate & judge..."
+CD_PROJ="$(mktemp -d)"
+CD_BIN="$(mktemp -d)"
+CD_SID="test_drift_$$"
+CD_STATE="/tmp/agent_context_forge/drift_${CD_SID}"
+# The stub logs its arguments, ACF_CONTEXT_DRIFT and the prompt it reads on stdin, then answers
+# per $CD_BIN/mode: a canned result (default), a non-zero exit, or a sleep past the timeout.
+cat > "$CD_BIN/claude" <<'STUB'
+#!/usr/bin/env bash
+dir="$(dirname "$0")"
+{ echo "=== call"; printf 'ARG %s\n' "$@"; echo "ENV ACF_CONTEXT_DRIFT=${ACF_CONTEXT_DRIFT-}"; echo "PROMPT"; cat; } >> "$dir/log"
+case "$(cat "$dir/mode" 2>/dev/null)" in
+  fail) exit 1 ;;
+  sleep) exec sleep 30 ;;
+esac
+cat "$dir/reply.json"
+STUB
+chmod +x "$CD_BIN/claude"
+jq -n '{type: "result", is_error: false, structured_output: {ask: true, findings: [
+  {file: "CLAUDE.md", context_quote: "Data lives in `data/notes.json`.", diff_evidence: "+import { PrismaClient } from \"@prisma/client\";", problem: "notes moved to a database", severity: "false"},
+  {file: "CLAUDE.md", context_quote: "Data lives in Postgres behind Prisma.", diff_evidence: "+import { PrismaClient } from \"@prisma/client\";", problem: "quote is invented", severity: "false"},
+  {file: "CLAUDE.md", context_quote: "Data lives in `data/notes.json`.", diff_evidence: "+const db = new MongoClient(url);", problem: "evidence is invented", severity: "false"}]}}' > "$CD_BIN/reply.json"
+cdrift() {
+  jq -nc --arg sid "$CD_SID" --arg cwd "$CD_PROJ" "$1 + {session_id: \$sid, cwd: \$cwd}" |
+    PATH="$CD_BIN:$PATH" CLAUDE_PROJECT_DIR="$CD_PROJ" "$REPO_ROOT/.claude/hooks/context-drift.py"
+}
+cd_stop() { rm -f "$CD_BIN/log"; cdrift '{hook_event_name: "Stop", stop_hook_active: false}'; }
+
+mkdir -p "$CD_PROJ/src" "$CD_PROJ/docs" "$CD_PROJ/tests"
+printf -- '# Notes API\n\n- Stack: TypeScript on Node.js with Express.\n- Data lives in `data/notes.json`.\n' > "$CD_PROJ/CLAUDE.md"
+printf '{\n  "name": "notes",\n  "dependencies": {\n    "express": "^4.19.0"\n  }\n}\n' > "$CD_PROJ/package.json"
+printf 'import express from "express";\nconst app = express();\napp.listen(3000);\n' > "$CD_PROJ/src/server.ts"
+printf '# Guide\n' > "$CD_PROJ/docs/guide.md"
+printf 'test("boots", () => {});\n' > "$CD_PROJ/tests/server.test.ts"
+printf 'API_KEY=sk-live-OLD\n' > "$CD_PROJ/.env"
+
+assert_ok "Session start takes a snapshot and says nothing" test -z "$(cdrift '{hook_event_name: "SessionStart", source: "startup"}')"
+assert_ok "The snapshot is on disk in the hook's own state dir" test -d "$CD_STATE/snapshot"
+assert_ok "A turn with no content change never calls the judge" test -z "$(cd_stop)" -a ! -e "$CD_BIN/log"
+printf 'More words.\n' >> "$CD_PROJ/docs/guide.md"
+printf 'test("stops", () => {});\n' >> "$CD_PROJ/tests/server.test.ts"
+cd_stop >/dev/null
+assert_ok "A docs-only or tests-only turn never calls the judge" test ! -e "$CD_BIN/log"
+sed -i.bak 's/^/  /' "$CD_PROJ/src/server.ts" && rm "$CD_PROJ/src/server.ts.bak"
+cd_stop >/dev/null
+assert_ok "A formatting-only turn never calls the judge" test ! -e "$CD_BIN/log"
+printf '{\n  "name": "notes",\n  "dependencies": {\n    "express": "^4.19.0",\n    "prisma": "^5.0.0"\n  }\n}\n' > "$CD_PROJ/package.json"
+cd_stop >/dev/null
+assert_ok "A changed manifest sends the diff and the context files to the judge" bash -c "grep -qF '+    \"prisma\": \"^5.0.0\"' '$CD_BIN/log' && grep -qF 'Stack: TypeScript on Node.js with Express.' '$CD_BIN/log'"
+assert_ok "The judge runs with hooks disabled and ACF_CONTEXT_DRIFT=off in its environment" bash -c "grep -qx 'ARG --settings' '$CD_BIN/log' && grep -qxF 'ARG {\"hooks\":{}}' '$CD_BIN/log' && grep -qx 'ENV ACF_CONTEXT_DRIFT=off' '$CD_BIN/log' && grep -qx 'ARG haiku' '$CD_BIN/log'"
+sed -i.bak 's/from "express"/from "fastify"/' "$CD_PROJ/src/server.ts" && rm "$CD_PROJ/src/server.ts.bak"
+cd_stop >/dev/null
+assert_ok "A change made through Bash gets a real diff" grep -qF '+  import express from "fastify";' "$CD_BIN/log"
+printf 'API_KEY=sk-live-NEW\n' > "$CD_PROJ/.env"
+printf -- '-----BEGIN PRIVATE KEY-----\nTOPSECRETPEM\n' > "$CD_PROJ/key.pem"
+printf '{"token": "TOPSECRETCRED"}\n' > "$CD_PROJ/credentials.json"
+mkdir -p "$CD_PROJ/.claude" && printf '{"env": {"TOKEN": "TOPSECRETLOCAL"}}\n' > "$CD_PROJ/.claude/settings.local.json"
+printf 'export const db = "sqlite";\n' > "$CD_PROJ/src/db.ts"
+cd_stop >/dev/null
+assert_ok "Secrets never reach the prompt" bash -c "grep -qF 'sqlite' '$CD_BIN/log' && ! grep -qE 'sk-live|TOPSECRET|key\\.pem|credentials\\.json|settings\\.local|\\.env' '$CD_BIN/log'"
+assert_ok "Secrets never reach the snapshot" bash -c "! grep -rqE 'sk-live|TOPSECRET' '$CD_STATE'"
+printf 'app.get("/health", () => "ok");\n' >> "$CD_PROJ/src/server.ts"
+cdrift '{hook_event_name: "SessionStart", source: "compact"}' >/dev/null
+cdrift '{hook_event_name: "SessionStart", source: "resume"}' >/dev/null
+cd_stop >/dev/null
+assert_ok "Compaction and resume keep the snapshot" grep -qF '+app.get("/health", () => "ok");' "$CD_BIN/log"
+
+# Failures and an over-cap tree allow the stop: no output, exit 0
+cd_silent() { local out rc=0; out="$("$@" 2>&1)" || rc=$?; test -z "$out" -a "$rc" -eq 0; }
+NOCLAUDE_BIN="$(mktemp -d)"
+ln -s "$(python3 -c 'import sys; print(sys.executable)')" "$NOCLAUDE_BIN/python3"
+printf 'export const a = 1;\n' > "$CD_PROJ/src/a.ts"
+cd_noclaude() {
+  jq -nc --arg sid "$CD_SID" '{hook_event_name: "Stop", stop_hook_active: false, session_id: $sid}' |
+    env PATH="$NOCLAUDE_BIN:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$CD_PROJ" "$REPO_ROOT/.claude/hooks/context-drift.py"
+}
+assert_ok "Missing claude allows the stop silently" cd_silent cd_noclaude
+echo fail > "$CD_BIN/mode"
+printf 'export const a = 2;\n' > "$CD_PROJ/src/a.ts"
+cd_judged_silently() { cd_silent cd_stop && test -s "$CD_BIN/log"; }
+assert_ok "A judge that exits non-zero allows the stop silently" cd_judged_silently
+echo sleep > "$CD_BIN/mode"
+printf 'export const a = 3;\n' > "$CD_PROJ/src/a.ts"
+CD_T0=$SECONDS
+export ACF_CONTEXT_DRIFT_TIMEOUT=2
+assert_ok "A judge that sleeps past the timeout allows the stop silently" cd_judged_silently
+unset ACF_CONTEXT_DRIFT_TIMEOUT
+assert_ok "The timeout is enforced" test $((SECONDS - CD_T0)) -lt 15
+rm -f "$CD_BIN/mode"
+mkdir -p "$CD_PROJ/bulk" && (cd "$CD_PROJ/bulk" && seq 1 10001 | sed 's/^/f/' | xargs touch)
+printf 'export const a = 4;\n' > "$CD_PROJ/src/a.ts"
+assert_ok "An over-cap tree allows the stop silently" cd_silent cd_stop
+assert_ok "An over-cap tree never calls the judge" test ! -e "$CD_BIN/log"
+
+# A project with no context files has nothing to go stale
+CD_NOCTX="$(mktemp -d)"
+printf '{"name": "x"}\n' > "$CD_NOCTX/package.json"
+CD_PROJ="$CD_NOCTX" CD_SID="${CD_SID}_noctx" cdrift '{hook_event_name: "SessionStart", source: "startup"}' >/dev/null
+printf '{"name": "x", "dependencies": {"prisma": "^5.0.0"}}\n' > "$CD_NOCTX/package.json"
+CD_PROJ="$CD_NOCTX" CD_SID="${CD_SID}_noctx" cd_stop >/dev/null
+assert_ok "No context files means no judge call" test ! -e "$CD_BIN/log"
+
+# --judge-dirs BEFORE AFTER (the scorer's interface): only verified findings survive
+CD_DIRS="$(mktemp -d)"
+mkdir -p "$CD_DIRS/before/src" "$CD_DIRS/after/src"
+printf -- '- Data lives in `data/notes.json`.\n' | tee "$CD_DIRS/before/CLAUDE.md" > "$CD_DIRS/after/CLAUDE.md"
+printf 'import { readFileSync } from "node:fs";\n' > "$CD_DIRS/before/src/store.ts"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_DIRS/after/src/store.ts"
+JUDGED="$(PATH="$CD_BIN:$PATH" "$REPO_ROOT/.claude/hooks/context-drift.py" --judge-dirs "$CD_DIRS/before" "$CD_DIRS/after")"
+assert_ok "--judge-dirs keeps a verified finding and names its file" jq -e '.ask and (.reasons[0] | test("moved to a database")) and .stale_files == ["CLAUDE.md"]' <<<"$JUDGED"
+assert_ok "Findings whose quote is not in the context files are dropped" jq -e '[.reasons[] | select(test("quote is invented"))] | length == 0' <<<"$JUDGED"
+assert_ok "Findings whose evidence is not in the diff are dropped" jq -e '(.reasons | length == 1) and ([.reasons[] | select(test("evidence is invented"))] | length == 0)' <<<"$JUDGED"
+rm -rf "$CD_PROJ" "$CD_BIN" "$NOCLAUDE_BIN" "$CD_NOCTX" "$CD_DIRS" "$CD_STATE" "${CD_STATE}_noctx"
 
 echo "---------------------------------------------------"
 printf 'Passed: %d | Failed: %d\n' "$PASS" "$FAIL"

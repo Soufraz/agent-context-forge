@@ -21,8 +21,17 @@ const HARNESS_HOOK_SCRIPTS = [
   '.claude/hooks/pre-commit-prefix-stability.sh',
   '.claude/hooks/guard-subagent-isolation.py',
   '.claude/hooks/pre-compact-handover.sh',
-  '.claude/hooks/context-stability.py'
+  '.claude/hooks/context-stability.py',
+  '.claude/hooks/context-drift.py'
 ];
+
+// Asks the user at the end of a turn that made the context files stale; see its header.
+// The Stop timeout must exceed the judge's own 150 s timeout.
+const contextDriftHook = {
+  type: 'command',
+  command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/context-drift.py"',
+  timeout: 180
+};
 
 // One script handles every Context Stability event (rule capture, re-injection after
 // compaction, and the gates in .claude/enforced-rules.json); see its header.
@@ -59,6 +68,22 @@ const LEGACY_HARNESS_DENY_RULES = new Set([
   'Read(**/*.min.css)',
   'Read(**/*.map)'
 ]);
+
+// The manifest of an earlier install, or null when there is none or it is not a JSON object.
+const readManifest = (targetDir) => {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, '.claude', 'context-forge.json'), 'utf-8'));
+    return manifest && typeof manifest === 'object' && !Array.isArray(manifest) ? manifest : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * True when targetDir already has an acf install (a readable `.claude/context-forge.json`).
+ * Installs that do are upgrades: they get the context drift hook only when they opt in.
+ */
+export const isExistingInstall = (targetDir) => readManifest(targetDir) !== null;
 
 const sha256 = (content) => crypto.createHash('sha256').update(content).digest('hex');
 
@@ -138,14 +163,24 @@ export function scaffoldProject(targetDir, options = {}) {
     projectContext = null
   } = options;
 
+  const previousManifest = readManifest(targetDir);
+  // A new install gets the context drift hook; an upgrade keeps what its manifest says, and
+  // an older manifest without the key means it was never installed. It sends source diffs
+  // to a model, so an upgrade only gains it when the caller passes 'on'.
+  const contextDrift =
+    options.contextDrift === 'on' || options.contextDrift === 'off'
+      ? options.contextDrift
+      : previousManifest
+        ? previousManifest.contextDrift === 'on'
+          ? 'on'
+          : 'off'
+        : 'on';
+
   const result = { files: [], backups: [], proposals: [] };
   const installedHashes = {};
 
   const manifestPath = path.join(targetDir, '.claude', 'context-forge.json');
-  let previousHashes = {};
-  try {
-    previousHashes = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')).files || {};
-  } catch {}
+  const previousHashes = previousManifest?.files || {};
 
   const ensureDir = (dirPath) => {
     if (!fs.existsSync(dirPath)) {
@@ -309,7 +344,8 @@ export function scaffoldProject(targetDir, options = {}) {
             statusMessage: 'Loading project facts and checking the environment...'
           },
           // No matcher, so it also runs after compaction (source "compact") to re-inject rules
-          contextStabilityHook
+          contextStabilityHook,
+          ...(contextDrift === 'on' ? [contextDriftHook] : [])
         ]
       }
     ],
@@ -327,7 +363,7 @@ export function scaffoldProject(targetDir, options = {}) {
         ]
       }
     ],
-    Stop: [{ hooks: [contextStabilityHook] }]
+    Stop: [{ hooks: [contextStabilityHook, ...(contextDrift === 'on' ? [contextDriftHook] : [])] }]
   };
 
   installSettings(path.join(targetDir, '.claude', 'settings.json'), settings);
@@ -354,6 +390,15 @@ export function scaffoldProject(targetDir, options = {}) {
     path.join(targetDir, '.claude', 'hooks', 'context-stability.py'),
     true
   );
+  // Turning it off drops its settings.json entries (the merge above) but leaves an installed
+  // script in place, since the user may have edited it; nothing runs it without the entries.
+  if (contextDrift === 'on') {
+    copyFileWithPerms(
+      path.join(hooksDir, 'context-drift.py'),
+      path.join(targetDir, '.claude', 'hooks', 'context-drift.py'),
+      true
+    );
+  }
   writeFileWithPerms(
     path.join(targetDir, '.claude', 'enforced-rules.json'),
     JSON.stringify(ENFORCED_RULES_STARTER, null, 2) + '\n',
@@ -495,6 +540,7 @@ You selected [context-mode](https://github.com/mksglu/context-mode) for advanced
     subagentIsolation,
     episodicMemory,
     sdd,
+    contextDrift,
     installedAt: new Date().toISOString(),
     // Hashes of the files as written, so a later upgrade can tell unedited files from edited ones
     files: installedHashes

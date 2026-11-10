@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process';
 
 import { inspectDirectory } from '../src/detector.js';
 import { generateProjectContext } from '../src/context-generator.js';
-import { scaffoldProject, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
+import { scaffoldProject, isExistingInstall, PROPOSAL_SUFFIX } from '../src/scaffolder.js';
 import { auditProject } from '../src/scanner/index.js';
 import { generateHtmlReport } from '../src/reporter/html-template.js';
 import { buildUsageReport, formatUsageReport, projectTranscriptDir } from '../src/usage-report.js';
@@ -214,6 +214,127 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
 
     fs.rmSync(tmpProject, { recursive: true, force: true });
     fs.rmSync(fresh, { recursive: true, force: true });
+  });
+
+  // Context drift hook: on for new installs, opt-in for projects that already have a manifest
+  const driftCommand = '"$CLAUDE_PROJECT_DIR/.claude/hooks/context-drift.py"';
+  const driftHooks = (project, event) => {
+    const settings = JSON.parse(fs.readFileSync(path.join(project, '.claude', 'settings.json'), 'utf-8'));
+    return (settings.hooks[event] || []).flatMap((g) => g.hooks).filter((h) => h.command.includes('context-drift.py'));
+  };
+  const readManifest = (project) =>
+    JSON.parse(fs.readFileSync(path.join(project, '.claude', 'context-forge.json'), 'utf-8'));
+  const driftScript = (project) => path.join(project, '.claude', 'hooks', 'context-drift.py');
+
+  test('scaffoldProject: a new install wires context-drift.py on SessionStart and Stop with a Stop timeout above 150', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_new_'));
+    scaffoldProject(tmpProject, {});
+
+    const settings = JSON.parse(fs.readFileSync(path.join(tmpProject, '.claude', 'settings.json'), 'utf-8'));
+    for (const event of ['SessionStart', 'Stop']) {
+      const hooks = driftHooks(tmpProject, event);
+      assert.equal(hooks.length, 1, `context-drift.py runs once on ${event}`);
+      assert.equal(hooks[0].command, driftCommand);
+      assert.ok(hooks[0].timeout > 150, `${event} timeout must exceed the judge's 150 s`);
+    }
+    const group = settings.hooks.SessionStart.find((g) => g.hooks.some((h) => h.command.includes('context-drift.py')));
+    assert.equal(group.matcher, undefined, 'SessionStart must also fire after compaction');
+    for (const event of Object.keys(settings.hooks).filter((e) => e !== 'SessionStart' && e !== 'Stop')) {
+      assert.equal(driftHooks(tmpProject, event).length, 0, `no context-drift.py on ${event}`);
+    }
+    assert.equal(readManifest(tmpProject).contextDrift, 'on');
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('scaffoldProject: re-running on an existing acf project without the option does not add the hook', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_upgrade_'));
+    scaffoldProject(tmpProject, { contextDrift: 'off' });
+    assert.equal(driftHooks(tmpProject, 'Stop').length, 0);
+
+    // An upgrade from an older acf: a manifest without the key
+    const manifestPath = path.join(tmpProject, '.claude', 'context-forge.json');
+    const { contextDrift, ...older } = readManifest(tmpProject);
+    fs.writeFileSync(manifestPath, JSON.stringify(older, null, 2) + '\n');
+
+    scaffoldProject(tmpProject, {});
+    for (const event of ['SessionStart', 'Stop']) {
+      assert.equal(driftHooks(tmpProject, event).length, 0, `no context-drift.py on ${event}`);
+    }
+    assert.ok(!fs.existsSync(driftScript(tmpProject)), 'the script is not installed');
+    assert.equal(readManifest(tmpProject).contextDrift, 'off');
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test("scaffoldProject: re-running with contextDrift 'on' adds it, and the manifest records it", () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_optin_'));
+    scaffoldProject(tmpProject, { contextDrift: 'off' });
+
+    scaffoldProject(tmpProject, { contextDrift: 'on' });
+    for (const event of ['SessionStart', 'Stop']) {
+      assert.equal(driftHooks(tmpProject, event).length, 1, `context-drift.py runs once on ${event}`);
+    }
+    assert.equal(readManifest(tmpProject).contextDrift, 'on');
+
+    // Re-running without the option keeps it on, and does not duplicate the entries
+    const again = scaffoldProject(tmpProject, {});
+    assert.equal(driftHooks(tmpProject, 'Stop').length, 1);
+    assert.equal(readManifest(tmpProject).contextDrift, 'on');
+    assert.equal(again.backups.length, 0);
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test("scaffoldProject: contextDrift 'off' on a project that had it removes its hook entries and keeps user hooks", () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_off_'));
+    scaffoldProject(tmpProject, {});
+    assert.equal(driftHooks(tmpProject, 'Stop').length, 1);
+
+    const settingsPath = path.join(tmpProject, '.claude', 'settings.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    settings.hooks.Stop.push({ hooks: [{ type: 'command', command: 'my-stop.sh' }] });
+    settings.hooks.SessionStart[0].hooks.push({ type: 'command', command: 'my-start.sh' });
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+
+    scaffoldProject(tmpProject, { contextDrift: 'off' });
+    for (const event of ['SessionStart', 'Stop']) {
+      assert.equal(driftHooks(tmpProject, event).length, 0, `no context-drift.py on ${event}`);
+    }
+    const after = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    assert.ok(after.hooks.Stop.some((g) => g.hooks.some((h) => h.command === 'my-stop.sh')));
+    assert.ok(after.hooks.SessionStart.some((g) => g.hooks.some((h) => h.command === 'my-start.sh')));
+    assert.equal(readManifest(tmpProject).contextDrift, 'off');
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
+  });
+
+  test('scaffoldProject: the hook script is installed executable only when on', () => {
+    const on = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_script_on_'));
+    const off = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_drift_script_off_'));
+    scaffoldProject(on, { contextDrift: 'on' });
+    scaffoldProject(off, { contextDrift: 'off' });
+
+    assert.equal(fs.statSync(driftScript(on)).mode & 0o111, 0o111, 'context-drift.py must be executable');
+    assert.ok(!fs.existsSync(driftScript(off)));
+
+    fs.rmSync(on, { recursive: true, force: true });
+    fs.rmSync(off, { recursive: true, force: true });
+  });
+
+  test('isExistingInstall: false for an empty dir and a dir with an unparseable manifest, true after scaffoldProject', () => {
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_isexisting_'));
+    assert.equal(isExistingInstall(tmpProject), false);
+
+    fs.mkdirSync(path.join(tmpProject, '.claude'));
+    fs.writeFileSync(path.join(tmpProject, '.claude', 'context-forge.json'), '{ not json');
+    assert.equal(isExistingInstall(tmpProject), false);
+
+    fs.rmSync(path.join(tmpProject, '.claude', 'context-forge.json'));
+    scaffoldProject(tmpProject, {});
+    assert.equal(isExistingInstall(tmpProject), true);
+
+    fs.rmSync(tmpProject, { recursive: true, force: true });
   });
 
   test('auditPillar1: measures what Claude Code loads, following @imports', () => {

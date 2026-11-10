@@ -291,7 +291,7 @@ async function offerGitInit(targetDir) {
 
   if (!init) {
     p.log.info(
-      'Not run until this folder is a git repository: the commit gate, the drift check on commit, the .githooks hook and the Stop rules.'
+      'Off until git init: commit gate, commit drift check, git hook, Stop rules.'
     );
     return;
   }

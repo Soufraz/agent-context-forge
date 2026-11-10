@@ -81,6 +81,39 @@ describe('Agent Context Forge CLI & Scanner Suite', () => {
     }
   });
 
+  test('gitRepoState: ignores GIT_DIR and the other variables that redirect git', () => {
+    const names = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_CEILING_DIRECTORIES', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'];
+    const saved = Object.fromEntries(names.map((n) => [n, process.env[n]]));
+    process.env.GIT_CONFIG_GLOBAL = '/dev/null';
+    process.env.GIT_CONFIG_NOSYSTEM = '1';
+    const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_git_env_repo_')));
+    const fresh = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'acf_test_git_env_fresh_')));
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: repo, stdio: 'pipe' });
+
+      // A bogus GIT_DIR must not make a real repository look like no repository
+      process.env.GIT_DIR = '/nonexistent';
+      process.env.GIT_WORK_TREE = '/nonexistent';
+      assert.equal(gitRepoState(repo), 'repo');
+
+      // A GIT_DIR pointing at a real repository must not make a fresh folder look like one
+      process.env.GIT_DIR = path.join(repo, '.git');
+      process.env.GIT_WORK_TREE = repo;
+      process.env.GIT_COMMON_DIR = path.join(repo, '.git');
+      process.env.GIT_INDEX_FILE = path.join(repo, '.git', 'index');
+      process.env.GIT_CEILING_DIRECTORIES = fresh;
+      assert.equal(gitRepoState(fresh), 'none');
+      assert.equal(process.env.GIT_DIR, path.join(repo, '.git'), 'the caller env is not mutated');
+    } finally {
+      for (const n of names) {
+        if (saved[n] === undefined) delete process.env[n];
+        else process.env[n] = saved[n];
+      }
+      fs.rmSync(repo, { recursive: true, force: true });
+      fs.rmSync(fresh, { recursive: true, force: true });
+    }
+  });
+
   test('explainNoGit: short, names the consequence and that no commit is made', () => {
     const text = explainNoGit();
     assert.ok(text.split('\n').length <= 6);

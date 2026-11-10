@@ -47,7 +47,15 @@ git -C "$DOCTOR_GIT_DIR" init -q
 DOCTOR_GIT_OUT="$(CLAUDE_PROJECT_DIR="$DOCTOR_GIT_DIR" GIT_CONFIG_GLOBAL=/dev/null "$REPO_ROOT/scripts/agent-gates/doctor.sh")"
 assert_ok "doctor.sh reports a git repository without a warning" grep -q "\[Git\]: inside a git repository" <<<"$DOCTOR_GIT_OUT"
 assert_ok "doctor.sh stays quiet about git inside a repository" bash -c '! grep -q "not a git repository" <<<"$1"' _ "$DOCTOR_GIT_OUT"
-rm -rf "$DOCTOR_GIT_DIR"
+# Any other git failure (dubious ownership, git not runnable) must not claim the folder is not a repository
+DOCTOR_FAKE_BIN="$(mktemp -d)"
+printf '#!/usr/bin/env bash\necho "fatal: detected dubious ownership in repository" >&2\nexit 128\n' > "$DOCTOR_FAKE_BIN/git"
+chmod +x "$DOCTOR_FAKE_BIN/git"
+DOCTOR_ODD_OUT="$(PATH="$DOCTOR_FAKE_BIN:$PATH" CLAUDE_PROJECT_DIR="$DOCTOR_GIT_DIR" "$REPO_ROOT/scripts/agent-gates/doctor.sh")"
+assert_ok "doctor.sh says it could not confirm a repository when git fails otherwise" grep -q "could not confirm a repository" <<<"$DOCTOR_ODD_OUT"
+assert_ok "doctor.sh does not claim the folder is not a repository on other git failures" bash -c '! grep -q "not a git repository" <<<"$1"' _ "$DOCTOR_ODD_OUT"
+assert_ok "doctor.sh does not suggest git init on other git failures" bash -c '! grep -q "git init" <<<"$1"' _ "$DOCTOR_ODD_OUT"
+rm -rf "$DOCTOR_GIT_DIR" "$DOCTOR_FAKE_BIN"
 
 # 3. Validate Prefix Stability Fast-Filter (Pillar 1)
 echo "[3/8] Checking pre-commit-prefix-stability.sh fast filter..."
@@ -185,7 +193,16 @@ FACTS_OUT="$(CLAUDE_PROJECT_DIR="$FACTS_DIR" "$REPO_ROOT/scripts/agent-gates/ses
 assert_ok "Session facts name the Python test command" jq -e '.hookSpecificOutput.additionalContext | test("uv run pytest")' <<<"$FACTS_OUT"
 assert_ok "Session facts name the JS package manager" jq -e '.hookSpecificOutput.additionalContext | test("pnpm test")' <<<"$FACTS_OUT"
 assert_ok "Session facts contain no paths" jq -e --arg d "$FACTS_DIR" '.hookSpecificOutput.additionalContext | contains($d) | not' <<<"$FACTS_OUT"
-rm -rf "$FACTS_DIR"
+assert_ok "Session start leaves the git notice out of a non-git folder's message" jq -e '(.systemMessage // "") | test("Git Notice|git init|not a git repository") | not' <<<"$FACTS_OUT"
+# The git notice is left out of the session message, other doctor warnings still pass through
+STUB_GATES="$(mktemp -d)"
+cp "$REPO_ROOT"/scripts/agent-gates/*.sh "$STUB_GATES/"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "⚠️  [Other Notice]: something else" "⚠️  [Git Notice]: this folder is not a git repository." "   Waits for git init." "→ do the other thing"\n' > "$STUB_GATES/doctor.sh"
+chmod +x "$STUB_GATES/doctor.sh"
+STUB_OUT="$(CLAUDE_PROJECT_DIR="$FACTS_DIR" "$STUB_GATES/session-context.sh")"
+assert_ok "Session start still forwards other doctor warnings" jq -e '.systemMessage | test("Other Notice") and test("do the other thing")' <<<"$STUB_OUT"
+assert_ok "Session start drops the git notice from the message" jq -e '.systemMessage | test("Git Notice|git init") | not' <<<"$STUB_OUT"
+rm -rf "$FACTS_DIR" "$STUB_GATES"
 
 # 7. Validate context-stability.py: rule capture across compaction and rule gates
 echo "[7/8] Checking context-stability.py rule capture & gates..."

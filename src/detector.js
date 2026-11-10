@@ -85,6 +85,16 @@ export function inspectDirectory(targetDir) {
   };
 }
 
+// Variables that point git somewhere else than the folder it runs in
+const GIT_REDIRECT_VARS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_CEILING_DIRECTORIES', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'];
+
+/** A copy of the environment that makes git answer about the folder itself, in English. */
+function gitProbeEnv() {
+  const env = { ...process.env, LC_ALL: 'C' };
+  for (const name of GIT_REDIRECT_VARS) delete env[name];
+  return env;
+}
+
 /**
  * Says whether a folder is a git repository.
  *
@@ -104,7 +114,7 @@ export function gitRepoState(dir) {
       stdio: 'pipe',
       encoding: 'utf-8',
       timeout: 5000,
-      env: { ...process.env, LC_ALL: 'C' }
+      env: gitProbeEnv()
     });
   } catch {
     return 'no-git';

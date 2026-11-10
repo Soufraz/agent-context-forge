@@ -12,6 +12,7 @@
     "src",
     "scripts",
     ".claude",
+    "!.claude/settings.local.json",
     ".agents",
     ".githooks",
     "CLAUDE.md",

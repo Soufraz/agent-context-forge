@@ -15,6 +15,13 @@ One script, dispatched on the hook event:
   the context files and the diff and names the sentences the turn made false. A finding is kept
   only when its quote is in the context files and its evidence is in the diff. The snapshot is
   then refreshed, so the next diff covers one turn.
+  If findings survive, Stop returns a blocking decision that tells Claude to ask the user with
+  AskUserQuestion (update the files now, skip, or turn the check off for the project). The same
+  findings are never asked twice, and the continuation (`stop_hook_active`) gets no output.
+
+ACF_CONTEXT_DRIFT=off turns the hook off entirely (the judge's own session runs with it set), and
+so does CLAUDE_CODE_SESSION_ATTENDED=0, which Claude Code sets for `claude -p` and the SDK: there
+is no human to ask.
 
 The judge sends the context files and the turn's diff to a model under the user's login. Secret
 files (.env*, *.pem, id_rsa*, *secret*, credentials*, ...) never enter the snapshot, the diff or
@@ -58,6 +65,9 @@ DIFF_LIMIT = 40_000
 JUDGE_TIMEOUT = 150  # seconds; ACF_CONTEXT_DRIFT_TIMEOUT overrides
 JUDGE_BUDGET_USD = "0.05"
 JUDGE_MODEL = "haiku"
+ASKED = "asked"  # in the state dir: one findings hash per line, recorded when the user is asked
+MAX_SHOWN = 5  # findings quoted in the question
+MAX_QUOTE = 300  # characters of one quote or piece of evidence shown
 
 # Dependencies, build output and caches: rewritten by tools, never what the context files describe.
 # A generated dir that sorts before src/ would otherwise fill the diff limit first. bin/ is kept:
@@ -447,6 +457,60 @@ def stop_findings(data: dict) -> list[dict]:
         take_snapshot(root, state)
 
 
+def findings_hash(findings: list[dict]) -> str:
+    """Identifies a set of findings by what they quote and cite, whatever order the judge lists them in."""
+    pairs = sorted([f.get("context_quote", ""), f.get("diff_evidence", "")] for f in findings)
+    return hashlib.sha256(json.dumps(pairs).encode("utf-8")).hexdigest()
+
+
+def short(text: str) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= MAX_QUOTE else text[:MAX_QUOTE - 3] + "..."
+
+
+def ask_reason(findings: list[dict]) -> str:
+    """What Claude is told when the turn made context statements untrue: ask first, edit only on a yes."""
+    lines = ["This turn made specific statements in the project's context files untrue. Those files are sent "
+             "with every request, so a wrong sentence misleads every later turn.", "", "Stale statements:"]
+    for i, f in enumerate(findings[:MAX_SHOWN], 1):
+        lines.append(f'{i}. {f.get("stale_files", [f.get("file", "")])[0] or "context file"}: '
+                     f'"{short(f.get("context_quote", ""))}"')
+        lines.append(f'   Changed by: {short(f.get("diff_evidence", ""))}')
+        if f.get("reason"):
+            lines.append(f'   Why: {short(f["reason"])}')
+    if len(findings) > MAX_SHOWN:
+        lines.append(f"(and {len(findings) - MAX_SHOWN} more)")
+    lines += ["",
+              "Before you finish, use the AskUserQuestion tool to ask the user what to do about this, with exactly "
+              'three options: "Update now", "Skip this change" and "Turn this check off for this project". '
+              "Do not edit the context files before the user answers.",
+              "",
+              '- "Update now": edit the context files minimally so these statements are true again. Keep them '
+              "short and free of task state (checkboxes, issue numbers, dates).",
+              '- "Turn this check off for this project": merge {"env": {"ACF_CONTEXT_DRIFT": "off"}} into '
+              ".claude/settings.local.json without removing anything already there (create the file if absent).",
+              '- "Skip this change": do nothing more.']
+    return "\n".join(lines)
+
+
+def handle_stop(data: dict) -> dict | None:
+    """The blocking decision that makes Claude ask the user, or None to let the stop through."""
+    if data.get("stop_hook_active"):  # the continuation after a question: stay silent, move the baseline
+        take_snapshot(Path.cwd(), state_dir(data["session_id"]))
+        return None
+    findings = stop_findings(data)
+    if not findings:
+        return None
+    state, digest = state_dir(data["session_id"]), findings_hash(findings)
+    asked = state / ASKED
+    if asked.is_file() and digest in asked.read_text(encoding="utf-8").split():
+        return None
+    state.mkdir(parents=True, exist_ok=True)
+    with open(asked, "a", encoding="utf-8") as f:  # recorded now, not when the user answers: one question per change
+        f.write(digest + "\n")
+    return {"decision": "block", "reason": ask_reason(findings)}
+
+
 def judge_dirs(before: str, after: str) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         state = Path(tmp)
@@ -461,7 +525,7 @@ def judge_dirs(before: str, after: str) -> dict:
 
 HANDLERS = {
     "SessionStart": session_start,
-    "Stop": stop_findings,
+    "Stop": handle_stop,
 }
 
 
@@ -473,13 +537,16 @@ def main() -> int:
             out = {"ask": False, "reasons": [], "stale_files": []}
         print(json.dumps(out))
         return 0
+    if os.environ.get("ACF_CONTEXT_DRIFT") == "off" or os.environ.get("CLAUDE_CODE_SESSION_ATTENDED") == "0":
+        return 0
     try:
         data = json.load(sys.stdin)
         os.chdir(os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or ".")
         data.setdefault("session_id", "default")
         handler = HANDLERS.get(data.get("hook_event_name", ""))
-        if handler:
-            handler(data)
+        result = handler(data) if handler else None
+        if result:
+            print(json.dumps(result))
     except Exception:
         pass
     return 0

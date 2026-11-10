@@ -335,6 +335,7 @@ echo "[8/8] Checking context-drift.py snapshot, diff, gate & judge..."
 CD_PROJ="$(mktemp -d)"
 CD_BIN="$(mktemp -d)"
 CD_SID="test_drift_$$"
+unset ACF_CONTEXT_DRIFT CLAUDE_CODE_SESSION_ATTENDED  # the tests set them per case
 CD_STATE="/tmp/agent_context_forge/drift_${CD_SID}"
 # The stub logs its arguments, ACF_CONTEXT_DRIFT and the prompt it reads on stdin, then answers
 # per $CD_BIN/mode: a canned result (default), a non-zero exit, or a sleep past the timeout.
@@ -411,8 +412,48 @@ printf 'export const port = 5000;\n' > "$CD_PROJ/src/config.ts"
 cd_stop >/dev/null
 assert_ok "A large vendor/ never trips the file cap" grep -qF '+export const port = 5000;' "$CD_BIN/log"
 
-# Failures and an over-cap tree allow the stop: no output, exit 0
+# The ask: a verified finding makes Stop block so that Claude asks the user (the stub judge returns it)
 cd_silent() { local out rc=0; out="$("$@" 2>&1)" || rc=$?; test -z "$out" -a "$rc" -eq 0; }
+cp "$CD_BIN/reply.json" "$CD_BIN/reply.orig.json"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store.ts"
+cd_stop > "$CD_BIN/out.json"
+assert_ok "Stop returns exactly one blocking decision" bash -c "test \"\$(wc -l < '$CD_BIN/out.json')\" -eq 1 && jq -e '.decision == \"block\" and (.reason | length > 0)' '$CD_BIN/out.json'"
+assert_ok "The reason quotes the stale sentence and the change" jq -e '.reason | contains("Data lives in `data/notes.json`.") and contains("+import { PrismaClient } from \"@prisma/client\";")' "$CD_BIN/out.json"
+assert_ok "The reason offers Update now, Skip this change and Turn this check off for this project" jq -e '.reason | contains("AskUserQuestion") and contains("\"Update now\"") and contains("\"Skip this change\"") and contains("\"Turn this check off for this project\"")' "$CD_BIN/out.json"
+assert_ok "The reason names the settings file and variable for the off switch" jq -e '.reason | contains(".claude/settings.local.json") and contains("{\"env\": {\"ACF_CONTEXT_DRIFT\": \"off\"}}")' "$CD_BIN/out.json"
+assert_ok "The reason keeps the update minimal and free of task state, and edits only after the answer" jq -e '.reason | contains("minimally") and contains("task state") and contains("Do not edit the context files before the user answers")' "$CD_BIN/out.json"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store2.ts"
+cd_stop > "$CD_BIN/out.json"
+assert_ok "The same findings are never asked twice (the judge still ran, one hash recorded)" test ! -s "$CD_BIN/out.json" -a -s "$CD_BIN/log" -a "$(wc -l < "$CD_STATE/asked")" -eq 1
+jq -n '{type: "result", is_error: false, structured_output: {ask: true, findings: [
+  {file: "CLAUDE.md", context_quote: "Stack: TypeScript on Node.js with Express.", diff_evidence: "+import fastify from \"fastify\";", problem: "express was replaced", severity: "false"}]}}' > "$CD_BIN/reply.json"
+printf 'import fastify from "fastify";\n' > "$CD_PROJ/src/s3.ts"
+cd_stop > "$CD_BIN/out.json"
+assert_ok "Different findings ask again" jq -e '.decision == "block" and (.reason | contains("Stack: TypeScript on Node.js with Express."))' "$CD_BIN/out.json"
+assert_ok "Each question is recorded when it is asked" test "$(wc -l < "$CD_STATE/asked")" -eq 2
+cp "$CD_BIN/reply.orig.json" "$CD_BIN/reply.json"
+printf 'export const z = 1;\n' > "$CD_PROJ/src/s4.ts"
+rm -f "$CD_BIN/log"
+cdrift '{hook_event_name: "Stop", stop_hook_active: true}' > "$CD_BIN/out.json"
+assert_ok "stop_hook_active true returns nothing" test ! -s "$CD_BIN/out.json"
+cd_stop > "$CD_BIN/out.json"
+assert_ok "stop_hook_active true still refreshes the snapshot" test ! -s "$CD_BIN/out.json" -a ! -e "$CD_BIN/log"
+printf 'import { PrismaClient } from "@prisma/client";\n' > "$CD_PROJ/src/store3.ts"
+printf 'export const z = 2;\n' > "$CD_PROJ/src/s4.ts"
+rm -f "$CD_BIN/log"
+ACF_CONTEXT_DRIFT=off cd_stop > "$CD_BIN/out.json"
+assert_ok "ACF_CONTEXT_DRIFT=off returns nothing and never calls the judge" test ! -s "$CD_BIN/out.json" -a ! -e "$CD_BIN/log"
+ACF_CONTEXT_DRIFT=off CD_SID="${CD_SID}_off" cdrift '{hook_event_name: "SessionStart", source: "startup"}' > "$CD_BIN/out.json"
+assert_ok "ACF_CONTEXT_DRIFT=off does not even take a snapshot" test ! -s "$CD_BIN/out.json" -a ! -e "/tmp/agent_context_forge/drift_${CD_SID}_off"
+CLAUDE_CODE_SESSION_ATTENDED=0 cd_stop > "$CD_BIN/out.json"
+assert_ok "A non-interactive session is skipped" test ! -s "$CD_BIN/out.json" -a ! -e "$CD_BIN/log"
+CLAUDE_CODE_SESSION_ATTENDED=1 cd_stop > "$CD_BIN/out.json"
+assert_ok "An interactive session (SESSION_ATTENDED=1) is still checked" test -s "$CD_BIN/log"
+for bad in '' 'not json' '[]' '{"hook_event_name": "Stop", "session_id": 5}' '{"hook_event_name": "Stop", "cwd": 7}'; do
+  assert_ok "Malformed input never breaks the session: ${bad:-empty}" cd_silent bash -c "printf '%s' '$bad' | PATH='$CD_BIN:$PATH' '$REPO_ROOT/.claude/hooks/context-drift.py'"
+done
+
+# Failures and an over-cap tree allow the stop: no output, exit 0
 NOCLAUDE_BIN="$(mktemp -d)"
 ln -s "$(python3 -c 'import sys; print(sys.executable)')" "$NOCLAUDE_BIN/python3"
 printf 'export const a = 1;\n' > "$CD_PROJ/src/a.ts"
@@ -456,7 +497,7 @@ JUDGED="$(PATH="$CD_BIN:$PATH" "$REPO_ROOT/.claude/hooks/context-drift.py" --jud
 assert_ok "--judge-dirs keeps a verified finding and names its file" jq -e '.ask and (.reasons[0] | test("moved to a database")) and .stale_files == ["CLAUDE.md"]' <<<"$JUDGED"
 assert_ok "Findings whose quote is not in the context files are dropped" jq -e '[.reasons[] | select(test("quote is invented"))] | length == 0' <<<"$JUDGED"
 assert_ok "Findings whose evidence is not in the diff are dropped" jq -e '(.reasons | length == 1) and ([.reasons[] | select(test("evidence is invented"))] | length == 0)' <<<"$JUDGED"
-rm -rf "$CD_PROJ" "$CD_BIN" "$NOCLAUDE_BIN" "$CD_NOCTX" "$CD_DIRS" "$CD_STATE" "${CD_STATE}_noctx"
+rm -rf "$CD_PROJ" "$CD_BIN" "$NOCLAUDE_BIN" "$CD_NOCTX" "$CD_DIRS" "$CD_STATE" "${CD_STATE}_noctx" "${CD_STATE}_off"
 
 echo "---------------------------------------------------"
 printf 'Passed: %d | Failed: %d\n' "$PASS" "$FAIL"
